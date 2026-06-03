@@ -1,0 +1,13 @@
+# pii-denylist.txt
+#
+# One term per line. Any file write or command whose text contains one of these
+# (case-insensitive substring) is HARD-BLOCKED by hooks/pii-guard.mjs.
+#
+# Add the specific names, handles, or initials you never want to appear in a
+# committed or published artifact. If the terms themselves are sensitive, keep
+# this file gitignored (it is listed in .gitignore by default).
+#
+# Examples (commented out - replace with your own, then uncomment):
+# Jane Doe
+# jdoe
+# @some-handle

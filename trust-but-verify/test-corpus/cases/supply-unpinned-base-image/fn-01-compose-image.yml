@@ -1,0 +1,5 @@
+# trust-but-verify corpus specimen. Label + rationale: test-corpus/manifest.yaml
+services:
+  cache:
+    image: redis:latest
+    ports: ["6379:6379"]

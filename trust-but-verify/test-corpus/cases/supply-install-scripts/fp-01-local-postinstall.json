@@ -1,0 +1,4 @@
+{
+  "name": "app",
+  "scripts": { "postinstall": "node ./scripts/build-assets.js" }
+}

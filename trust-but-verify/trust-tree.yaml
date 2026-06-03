@@ -1,0 +1,646 @@
+# trust-tree.yaml - canonical decision tree for the trust-but-verify skill.
+# Code domain. Other domains are future work.
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# NON-NEGOTIABLE BRANCH REQUIREMENTS - enforced at runtime
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Every branch in this file MUST have:
+#
+#   1. A `verify:` field that satisfies the three properties from SKILL.md
+#      § "What verification MUST be":
+#        - INDEPENDENT of the `detect:` signal (not a re-run of the same check)
+#        - AUTHORITATIVE (cites a real, current source)
+#        - FALSIFIABLE (defined pass/fail before it runs)
+#      A branch whose `verify:` is missing, vague, or a restatement of `detect:`
+#      MUST NOT ship findings to Phase 3. The skill drops the branch and surfaces
+#      "BROKEN BRANCH: <id> has no usable verification step" to the operator.
+#
+#   2. A `framework:` list with at least one entry from `baseline_frameworks:`.
+#      Branches with empty `framework:` MUST NOT ship. There is no "we'll add
+#      grounding later" path - grounding is the gate, not the polish.
+#
+#   3. A `liability_template:` block (user_harm + legal_exposure) for any branch
+#      in security / privacy / license / supply_chain / operational categories.
+#      A11y uses the accessibility-framed variant per dialogue-protocol.md.
+#
+# Verification is the load-bearing discipline of this skill. A branch that
+# cannot verify cannot ship findings, no matter how clever its detection is.
+#
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Edit this file to add detection branches. Every new branch must cite an
+# authoritative framework - that's the non-negotiable rule.
+#
+# Branch schema:
+#   id                 unique within the domain
+#   last_verified      ISO date this branch's detect/verify was last confirmed
+#                      against its cited framework version (see README
+#                      § "Keeping the trust tree fresh" + grounding.md)
+#   category           one of: security | privacy | license | a11y | supply_chain | operational
+#   question           what the auditor asks of the artifact
+#   detect             how to find candidate findings (regex / structural / tool-call)
+#   verify             the second-signal check - MUST be independent + authoritative + falsifiable
+#   severity           CRITICAL | HIGH | MEDIUM | LOW (base - adjusted by blast radius)
+#   framework          authoritative framework refs (must cite at least one)
+#   liability_template populates the LIABILITY FRAMING block in the dialogue
+#   fix_recipe         pointer into references/ (when written) or inline guidance
+
+version: "0.2.0"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Baseline frameworks - registry of authoritative sources for the code domain.
+# Every branch below cites at least one of these by id.
+# ─────────────────────────────────────────────────────────────────────────────
+baseline_frameworks:
+  security:
+    - id: owasp-top10-2021
+      name: "OWASP Top 10 (2021)"
+      url: "https://owasp.org/Top10/"
+      authority: "Open Worldwide Application Security Project"
+    - id: owasp-asvs-v4
+      name: "OWASP Application Security Verification Standard v4"
+      url: "https://owasp.org/www-project-application-security-verification-standard/"
+      authority: "OWASP"
+    - id: cwe-top25
+      name: "CWE Top 25 Most Dangerous Software Weaknesses"
+      url: "https://cwe.mitre.org/top25/"
+      authority: "MITRE Corporation"
+  privacy:
+    - id: gdpr
+      name: "GDPR (EU 2016/679)"
+      url: "https://gdpr-info.eu/"
+      authority: "European Union"
+    - id: ccpa-cpra
+      name: "CCPA / CPRA"
+      url: "https://oag.ca.gov/privacy/ccpa"
+      authority: "California Office of the Attorney General"
+    - id: coppa
+      name: "COPPA"
+      url: "https://www.ftc.gov/legal-library/browse/rules/childrens-online-privacy-protection-rule-coppa"
+      authority: "US Federal Trade Commission"
+  license:
+    - id: spdx
+      name: "SPDX License List"
+      url: "https://spdx.org/licenses/"
+      authority: "Linux Foundation"
+  a11y:
+    - id: wcag-2-2
+      name: "WCAG 2.2 (Level AA)"
+      url: "https://www.w3.org/TR/WCAG22/"
+      authority: "W3C"
+    - id: aria-apg
+      name: "WAI-ARIA Authoring Practices Guide"
+      url: "https://www.w3.org/WAI/ARIA/apg/"
+      authority: "W3C"
+    - id: section-508
+      name: "Section 508"
+      url: "https://www.section508.gov/"
+      authority: "US General Services Administration"
+  supply_chain:
+    - id: nist-ssdf
+      name: "NIST Secure Software Development Framework (SP 800-218)"
+      url: "https://csrc.nist.gov/Projects/ssdf"
+      authority: "US National Institute of Standards and Technology"
+    - id: slsa
+      name: "SLSA"
+      url: "https://slsa.dev/"
+      authority: "Open Source Security Foundation"
+    - id: openssf-scorecard
+      name: "OpenSSF Scorecard"
+      url: "https://github.com/ossf/scorecard"
+      authority: "OpenSSF"
+  operational:
+    - id: owasp-cheatsheets
+      name: "OWASP Cheat Sheet Series"
+      url: "https://cheatsheetseries.owasp.org/"
+      authority: "OWASP"
+    - id: nist-csf-2
+      name: "NIST Cybersecurity Framework 2.0"
+      url: "https://www.nist.gov/cyberframework"
+      authority: "US NIST"
+    - id: cis-controls-v8
+      name: "CIS Controls v8"
+      url: "https://www.cisecurity.org/controls/v8"
+      authority: "Center for Internet Security"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Triggers - file patterns the code domain applies to
+# ─────────────────────────────────────────────────────────────────────────────
+triggers:
+  - "*.js"
+  - "*.ts"
+  - "*.jsx"
+  - "*.tsx"
+  - "*.py"
+  - "*.go"
+  - "*.rs"
+  - "*.rb"
+  - "*.java"
+  - "*.kt"
+  - "*.swift"
+  - "*.cs"
+  - "*.php"
+  - "*.html"
+  - "*.css"
+  - "Dockerfile"
+  - "docker-compose*.yml"
+  - "*.tf"
+  - "*.yaml"
+  - "*.yml"
+  - "package.json"
+  - "Cargo.toml"
+  - "pyproject.toml"
+  - "go.mod"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RCA defaults - which root-cause framework the skill suggests per branch.
+#
+# Operator can override at dialogue time. Defaults below are TENTATIVE for v0.1;
+# v0.2 will revise against accumulated baseline data. Selection rationale:
+# see references/rca-frameworks.md § "Selection matrix".
+#
+# Allowed values:
+#   five_whys     - linear chain, single symptom (cheapest, default for most)
+#   fishbone      - categorical decomposition across People/Process/Tools/Data/Gov/External
+#   fault_tree    - AND/OR enumeration for safety-critical (heavy; use sparingly)
+#   bow_tie       - upstream causes + downstream consequences + barriers
+#   kepner_tregoe - partial / "where it is and isn't" diagnostic
+#   pareto        - for many findings in the same class (prioritization)
+# ─────────────────────────────────────────────────────────────────────────────
+rca_defaults:
+  sec-sql-injection:               five_whys
+  sec-xss:                         five_whys
+  sec-broken-access-control:       fishbone       # multi-category cause
+  sec-hardcoded-secret:            five_whys
+  sec-ssrf:                        bow_tie        # upstream + barriers + downstream
+  sec-weak-crypto:                 five_whys
+  priv-pii-in-logs:                fishbone       # logger config + dev habit + framework default
+  priv-no-data-rights:             fishbone       # process + governance + tooling
+  priv-pii-plaintext:              bow_tie        # at-rest leak with encryption barriers
+  license-dep-conflict:            five_whys
+  license-missing-attribution:     five_whys
+  a11y-missing-alt:                five_whys
+  a11y-form-no-labels:             five_whys
+  a11y-color-contrast:             five_whys
+  supply-actions-floating-tag:     fishbone       # people unaware + no tool + upstream docs
+  supply-lockfile-missing:         five_whys
+  supply-known-cve-deps:           pareto         # typically many; prioritize by impact
+  supply-floating-version-range:   five_whys      # v0.2 promotion
+  supply-install-scripts:          bow_tie        # upstream cause + downstream build-poisoning
+  supply-unpinned-base-image:      five_whys
+  supply-actions-excessive-permissions: fishbone  # people unaware + org policy + template default
+  op-missing-security-md:          five_whys
+  op-stack-trace-leakage:          five_whys
+  op-no-rate-limit:                bow_tie        # pairs with blast radius
+  epi-hedged-language:             five_whys
+  epi-unverified-external:         kepner_tregoe  # partial - "where verified vs where not"
+  epi-state-mutation-no-readback:  five_whys
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Branches - the actual checks
+# ─────────────────────────────────────────────────────────────────────────────
+branches:
+
+  # ═══════════════════════ CATEGORY 1: SECURITY ═══════════════════════
+
+  - id: sec-sql-injection
+    last_verified: "2026-05-25"
+    category: security
+    question: "Are database queries constructed with user input via string concatenation, template literals, or %-formatting instead of parameterized queries / ORM?"
+    detect:
+      - 'query\(\s*[`"][^`"]*\$\{[^}]+\}[^`"]*[`"]\s*\)'
+      - 'execute\(.*\+\s*\w+\)'
+      - "cursor\\.execute\\([\"'][^\"']*%s[^\"']*[\"']\\s*%\\s*"
+    verify: "Read 20 lines of context. Look for parameterization (second argument to query/execute, or ? / $1 placeholders). If absent, finding confirmed."
+    severity: CRITICAL
+    framework:
+      - owasp-top10-2021  # A03 Injection
+      - cwe-top25         # CWE-89
+    liability_template:
+      user_harm: "Any attacker with HTTP access can extract, modify, or delete database contents."
+      legal_exposure: "GDPR Art. 32 (security of processing). CCPA 'reasonable security'. PCI DSS Req 6.5.1 (payment data). HIPAA Security Rule § 164.312 (health data)."
+
+  - id: sec-xss
+    last_verified: "2026-05-25"
+    category: security
+    question: "Is user input rendered into HTML, JS, or URL contexts without context-appropriate escaping?"
+    detect:
+      - "innerHTML\\s*=\\s*[^;]*\\b(req|request|params|body|query|user)\\b"
+      - "dangerouslySetInnerHTML"
+      - "document\\.write\\("
+    verify: "Read context. Confirm no sanitization library (DOMPurify, sanitize-html, framework auto-escape). React JSX text-interpolation is safe; dangerouslySetInnerHTML is not."
+    severity: HIGH
+    framework:
+      - owasp-top10-2021  # A03 Injection
+      - cwe-top25         # CWE-79
+    liability_template:
+      user_harm: "Attacker-injected scripts steal session tokens, harvest credentials via fake overlays, or perform actions as the victim user."
+      legal_exposure: "Same regime as SQL injection if PII is exfiltrated."
+
+  - id: sec-broken-access-control
+    last_verified: "2026-05-25"
+    category: security
+    question: "Are object references (user IDs, resource IDs) trusted from the request without verifying the caller has access to that object?"
+    detect:
+      - "findById\\(\\s*req\\.(params|body|query)\\."
+      - "getById\\(\\s*request\\."
+    verify: "Walk 20 lines of context + function's call chain. Find the authorization check. If the request's user/session is not validated against the resource's owner, finding confirmed."
+    severity: CRITICAL
+    framework:
+      - owasp-top10-2021  # A01 Broken Access Control
+      - cwe-top25         # CWE-639 IDOR
+    liability_template:
+      user_harm: "Users can read, modify, or delete other users' data by guessing or enumerating IDs."
+      legal_exposure: "GDPR Art. 32. CCPA. HIPAA Privacy Rule (health data). PCI DSS Req 7 (payment data)."
+
+  - id: sec-hardcoded-secret
+    last_verified: "2026-05-25"
+    category: security
+    question: "Is a credential (API key, password, token, private key) hardcoded into a tracked file?"
+    detect:
+      # Patterns for detecting committed secrets - these are regex character
+      # classes, not secret values themselves.
+      - 'sk-[a-zA-Z0-9]{32,}'
+      - 'sk-ant-[a-zA-Z0-9]{32,}'
+      - 'ghp_[a-zA-Z0-9]{36}'
+      - 'AIza[a-zA-Z0-9_-]{35}'
+      - 'xox[bpsa]-[a-zA-Z0-9-]+'
+      - 'AKIA[A-Z0-9]{16}'
+      - '(?i)password\s*[=:]\s*["''][^"'']{6,}["'']'
+      - '(?i)secret\s*[=:]\s*["''][^"'']{12,}["'']'
+      - "-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----"
+    verify: "Confirm not a placeholder (xxx, <your-key-here>, EXAMPLE, all-zeros). Check git history with git log -p -S '<prefix>' - if ever committed, treat as COMPROMISED."
+    severity: CRITICAL
+    framework:
+      - owasp-top10-2021  # A02 Cryptographic Failures
+      - cwe-top25         # CWE-798 Hardcoded credentials
+      - nist-ssdf
+    liability_template:
+      user_harm: "Anyone with current or historical read access to the repo can impersonate the application against the credentialed service."
+      legal_exposure: "Same regulatory regime as breached PII. The credential must be ROTATED at the provider; removing from current code is insufficient if it has ever been in git history."
+
+  - id: sec-ssrf
+    last_verified: "2026-05-25"
+    category: security
+    question: "Does the application fetch from URLs supplied by user input without an allowlist?"
+    detect:
+      - "fetch\\(.*req\\."
+      - "axios\\.(get|post|put|delete)\\(.*req\\."
+      - "urllib\\.(request|urlopen)\\(.*request\\."
+    verify: "Walk to URL construction. If fully user-controlled with no allowlist, finding confirmed. Allowlists must be deny-by-default."
+    severity: HIGH
+    framework:
+      - owasp-top10-2021  # A10 SSRF
+      - cwe-top25         # CWE-918
+    liability_template:
+      user_harm: "Attacker forces server to make requests to internal services (cloud metadata, admin interfaces), potentially leaking secrets."
+      legal_exposure: "Same regime as injection if data is exfiltrated."
+
+  - id: sec-weak-crypto
+    last_verified: "2026-05-25"
+    category: security
+    question: "Are passwords or sensitive tokens hashed with MD5, SHA1, or unsalted SHA-2?"
+    detect:
+      - "(?i)(md5|sha1)\\b.*(password|pwd|passphrase)"
+      - "hashlib\\.(md5|sha1)\\("
+      - "crypto\\.createHash\\(\\s*['\"](md5|sha1)['\"]"
+    verify: "Confirm it's a password/token use, not a non-security checksum (file integrity, cache key)."
+    severity: HIGH
+    framework:
+      - owasp-top10-2021  # A02 Cryptographic Failures
+      - cwe-top25         # CWE-327
+    liability_template:
+      user_harm: "Cracked passwords lead to account takeover. MD5/SHA1 are crackable at scale on commodity GPUs."
+      legal_exposure: "Falls under 'reasonable security' regulatory standards (FTC, PCI DSS, HIPAA Security Rule)."
+
+  # ═══════════════════════ CATEGORY 2: PRIVACY ═══════════════════════
+
+  - id: priv-pii-in-logs
+    last_verified: "2026-05-25"
+    category: privacy
+    question: "Is PII (email, name, IP, payment, health data) written to logs without redaction?"
+    detect:
+      - "(?i)logger?\\.(info|warn|error|debug)\\(.*\\b(user|email|password|ssn|credit|patient)"
+      - "(?i)console\\.log\\(.*\\b(user|email|password|ssn)"
+      - "(?i)print\\(.*\\b(user|email|password|ssn)"
+    verify: "Read context. Confirm the logged value contains PII (not just a variable named 'user' holding a redacted ID)."
+    severity: HIGH
+    framework:
+      - gdpr  # Art. 5(1)(c) data minimization, Art. 32 security
+      - ccpa-cpra
+      - owasp-top10-2021  # A09 Security Logging Failures
+    liability_template:
+      user_harm: "Logs replicate to many systems (SIEM, backups, observability platforms) - each becomes a new exposure surface for the PII."
+      legal_exposure: "GDPR Art. 5(1)(c) violation (data minimization). May trigger Art. 33/34 breach notification."
+
+  - id: priv-no-data-rights
+    last_verified: "2026-05-25"
+    category: privacy
+    question: "If the application stores user PII, is there a documented + exercisable path for users to request deletion (GDPR Art. 17) and data export (Art. 20)?"
+    detect:
+      - "structural: scan for /delete /export endpoints; scan UI/docs for 'delete account' or 'export data' flows"
+    verify: "Confirm whether endpoint exists and is reachable. If unimplemented, finding confirmed."
+    severity: HIGH
+    framework:
+      - gdpr  # Art. 17 right to erasure, Art. 20 portability
+      - ccpa-cpra
+    liability_template:
+      user_harm: "Users cannot exercise statutory rights over their own data."
+      legal_exposure: "GDPR Art. 17 + 20 non-compliance - fines up to 4% global annual turnover. CCPA: $2,500 per violation; $7,500 if intentional."
+
+  - id: priv-pii-plaintext
+    last_verified: "2026-05-25"
+    category: privacy
+    question: "Is PII stored in databases or files without encryption at rest?"
+    detect:
+      - "structural: database column types (varchar, text) for PII fields; no encryption library imports; no DB-level encryption config"
+    verify: "Check schema migrations, ORM models, config files for encryption indicators (pgcrypto, column-level encryption, KMS integration)."
+    severity: HIGH
+    framework:
+      - gdpr  # Art. 32
+      - ccpa-cpra
+      - nist-ssdf
+    liability_template:
+      user_harm: "Any database breach immediately exposes all PII in plaintext."
+      legal_exposure: "GDPR Art. 32 - failure to implement appropriate technical measures. May aggravate breach disclosure penalties."
+
+  # ═══════════════════════ CATEGORY 3: LICENSE & IP ═══════════════════════
+
+  - id: license-dep-conflict
+    last_verified: "2026-05-25"
+    category: license
+    question: "Are dependency licenses compatible with the project's declared license?"
+    detect:
+      - "structural: walk lockfile (package-lock.json / Cargo.lock / poetry.lock); look up each dep's license via SPDX"
+    verify: "Cross-reference each dep's license against the project's LICENSE. Flag GPL deps in non-GPL projects, AGPL deps in commercial projects, unknown licenses."
+    severity: HIGH
+    framework:
+      - spdx
+    liability_template:
+      user_harm: "None directly."
+      legal_exposure: "GPL-taint can force open-sourcing of proprietary code. AGPL extends to SaaS use. 'Free for personal use' licenses can void commercial deployments."
+
+  - id: license-missing-attribution
+    last_verified: "2026-05-25"
+    category: license
+    question: "Are CC-BY / MIT / Apache-2.0 dependencies + assets properly attributed in a NOTICE / CREDITS file?"
+    detect:
+      - "structural: presence of attribution-requiring assets in repo; absence of CREDITS.md / NOTICE / THIRD_PARTY_LICENSES"
+    verify: "Walk asset directories and dep tree; confirm each attribution-requiring dep is credited."
+    severity: MEDIUM
+    framework:
+      - spdx
+    liability_template:
+      user_harm: "None directly."
+      legal_exposure: "License non-compliance is a copyright violation; rights-holders can issue DMCA takedowns or sue for damages."
+
+  # ═══════════════════════ CATEGORY 4: ACCESSIBILITY ═══════════════════════
+
+  - id: a11y-missing-alt
+    last_verified: "2026-05-25"
+    category: a11y
+    question: "Do all <img> tags have meaningful alt attributes (or alt='' for purely decorative)?"
+    detect:
+      - "<img(?![^>]*\\balt=)[^>]*>"
+    verify: "Confirm the image is content-bearing (not decorative). Empty alt='' is correct for decorative; missing alt is wrong for both."
+    severity: MEDIUM
+    framework:
+      - wcag-2-2     # 1.1.1 Non-text Content (Level A)
+      - section-508
+    liability_template:
+      users_affected: "Users relying on screen readers cannot understand or navigate content."
+      wcag_criterion: "WCAG 2.2 Level A 1.1.1 Non-text Content"
+      legal_context: "ADA Title III (US) - inaccessible websites have been ruled 'places of public accommodation' (Domino's Pizza v. Robles, 9th Cir. 2019)."
+
+  - id: a11y-form-no-labels
+    last_verified: "2026-05-25"
+    category: a11y
+    question: "Do all form inputs have associated <label> elements, aria-label, or aria-labelledby?"
+    detect:
+      - "<input(?![^>]*\\b(id|aria-label))[^>]*>"
+    verify: "Walk surrounding context. If an <input> has neither id+label nor aria-label, finding confirmed."
+    severity: MEDIUM
+    framework:
+      - wcag-2-2    # 3.3.2 Labels or Instructions (Level A), 4.1.2 Name Role Value (Level A)
+      - aria-apg
+    liability_template:
+      users_affected: "Screen reader users cannot fill out the form."
+      wcag_criterion: "WCAG 2.2 Level A 3.3.2 + 4.1.2"
+
+  - id: a11y-color-contrast
+    last_verified: "2026-05-25"
+    category: a11y
+    question: "Do foreground/background color combinations meet WCAG 2.2 AA contrast ratios (4.5:1 normal text, 3:1 large)?"
+    detect:
+      - "structural: scan CSS for color + background-color pairs; compute contrast ratio per WCAG algorithm"
+    verify: "Apply the WCAG contrast formula. Flag pairs below threshold."
+    severity: MEDIUM
+    framework:
+      - wcag-2-2  # 1.4.3 Contrast (Minimum) (Level AA)
+    liability_template:
+      users_affected: "Users with low vision cannot read content."
+      wcag_criterion: "WCAG 2.2 Level AA 1.4.3 Contrast (Minimum)"
+
+  # ═══════════════════════ CATEGORY 5: SUPPLY CHAIN ═══════════════════════
+
+  - id: supply-actions-floating-tag
+    last_verified: "2026-05-25"
+    category: supply_chain
+    question: "Are GitHub Actions pinned to a commit SHA, or to a floating @vN tag (which can be silently re-pointed)?"
+    detect:
+      - "uses:\\s+[\\w-]+/[\\w-]+@v\\d+\\s*$"
+      - "uses:\\s+[\\w-]+/[\\w-]+@(main|master)\\s*$"
+    verify: "Confirm the ref isn't already a 40-char SHA."
+    severity: HIGH
+    framework:
+      - nist-ssdf
+      - slsa
+      - openssf-scorecard  # 'Pinned-Dependencies' check
+    liability_template:
+      user_harm: "Compromised Action can exfiltrate repo contents, secrets, or inject malicious code into builds."
+      legal_exposure: "Recent supply chain incidents (e.g., tj-actions/changed-files 2025) demonstrate the real risk."
+
+  - id: supply-lockfile-missing
+    last_verified: "2026-05-25"
+    category: supply_chain
+    question: "Is the lockfile (package-lock.json / yarn.lock / Cargo.lock / poetry.lock / Pipfile.lock) committed?"
+    detect:
+      - "structural: package manifest present but no lockfile committed"
+    verify: "git ls-files | grep -E '(package-lock|yarn|Cargo|poetry|Pipfile)\\.(json|lock)'"
+    severity: HIGH
+    framework:
+      - nist-ssdf
+      - openssf-scorecard
+    liability_template:
+      user_harm: "Builds produce different outputs across machines/CI runs. Malicious dep version can be silently introduced via floating ranges."
+      legal_exposure: "SOC 2 CC8.1/CC8.2 controls - change management implications."
+
+  - id: supply-known-cve-deps
+    last_verified: "2026-05-25"
+    category: supply_chain
+    question: "Do any dependencies have known CVEs?"
+    detect:
+      - "tool-call: npm audit / pip-audit / cargo audit"
+    verify: "Run the appropriate audit tool. Parse JSON output. Findings adjusted by CVSS (≥7.0 = HIGH; lower = MEDIUM)."
+    severity: HIGH  # adjusted per CVSS
+    framework:
+      - nist-ssdf
+      - cwe-top25
+    liability_template:
+      legal_exposure: "Shipping known-vulnerable code is 'reasonable security' failure under FTC, GDPR, CCPA, SOC 2."
+
+  # -- v0.2 supply-chain branches --
+
+  - id: supply-floating-version-range
+    last_verified: "2026-06-02"
+    category: supply_chain
+    question: "Do dependency manifests pin exact versions, or use floating ranges (^, ~, >=, *) that can resolve to a different version on a fresh install?"
+    detect:
+      - '"[\w@/.-]+"\s*:\s*"[\^~][^"]*"'      # npm caret/tilde range in package.json
+      - '"[\w@/.-]+"\s*:\s*"\*"'              # npm wildcard
+      - '^[\w.-]+\s*(>=|~=|>)'                # pip non-exact specifier (requirements.txt)
+    verify: "Confirm the floating range governs a dependency (not an engines/peer constraint) AND assess lockfile coverage: even WITH a lockfile, a ^ range means a non-`ci` install can pull a new minor/patch. Independent of detect (manifest grep vs lockfile read + field context)."
+    severity: MEDIUM        # -> HIGH when no lockfile is present (compounds supply-lockfile-missing)
+    framework:
+      - nist-ssdf           # PW.4.1 reproducible components
+      - openssf-scorecard   # Pinned-Dependencies
+    liability_template:
+      user_harm: "A buggy or compromised new version is silently pulled into a fresh install or CI run, changing shipped behavior with no code change and no review."
+      legal_exposure: "SOC 2 CC8.1 change-management; SSDF PW.4 reproducible-build conformance."
+
+  - id: supply-install-scripts
+    last_verified: "2026-06-02"
+    category: supply_chain
+    question: "Does the build execute untrusted install-time code - `curl ... | sh` / `wget ... | bash` in CI or Dockerfiles, or dependency lifecycle scripts (pre/postinstall)?"
+    detect:
+      - 'curl\s+[^|]*\|\s*(sudo\s+)?(ba)?sh'   # curl | sh
+      - 'wget\s+[^|]*\|\s*(ba)?sh'             # wget | bash
+      - '"(pre|post)install"\s*:'              # npm lifecycle script
+    verify: "Confirm a piped source is remote AND unpinned (no checksum/digest), or that a lifecycle script fetches/executes remote code rather than running a local build. Independent of detect (integrity-check + locality judgment vs pattern match)."
+    severity: HIGH
+    framework:
+      - nist-ssdf           # PW.4.4 / PS.3 provenance + integrity
+      - slsa                # L1+ provenance of build inputs
+      - cwe-top25           # CWE-829 functionality from an untrusted control sphere
+    liability_template:
+      user_harm: "Install-time arbitrary code execution: a compromised upstream script or a moved URL runs with build privileges, able to exfiltrate secrets or poison the artifact."
+      legal_exposure: "Supply-chain breach exposure; SSDF non-conformance; 'reasonable security' failure."
+
+  - id: supply-unpinned-base-image
+    last_verified: "2026-06-03"
+    category: supply_chain
+    question: "Are container base images AND docker:// action refs pinned to an immutable @sha256 digest, or to a mutable tag (:latest, a bare tag) that can be silently re-pointed?"
+    detect:
+      - 'FROM\s+\S+:latest'                    # explicit :latest
+      - 'FROM\s+[^@\s]+(\s|$)'                  # tag (or implicit latest) without an @sha256 digest
+      - 'uses:\s+docker://[^@\s]+(\s|$)'        # docker:// action ref without an @sha256 digest
+    verify: "Confirm the FROM / docker:// ref lacks an `@sha256:` digest and is not the special `scratch` base. A tag-with-digest (`node:20@sha256:...`) is pinned and clears. Independent of detect (digest/scratch check vs tag-pattern match)."
+    severity: HIGH
+    framework:
+      - slsa                # provenance / reproducible builds
+      - nist-ssdf           # PW.4.1
+      - openssf-scorecard   # Pinned-Dependencies (extends to container base layers)
+    liability_template:
+      user_harm: "The base layer is re-pointable: a compromised or simply newer upstream image silently changes what ships - the same risk class as a floating Action tag, one layer down the stack."
+      legal_exposure: "Reproducible-build / provenance gap; SOC 2 change-management implications."
+
+  - id: supply-actions-excessive-permissions
+    last_verified: "2026-06-02"
+    category: supply_chain
+    question: "Do GitHub Actions workflows declare least-privilege GITHUB_TOKEN permissions, or default to write-all (no permissions: block) / grant broad write?"
+    detect:
+      - "structural: .github/workflows/*.yml with NO top-level or job-level `permissions:` key, OR `permissions: write-all`"
+    verify: "Confirm the workflow lacks a least-privilege `permissions:` block (-> inherits the repo default, often write) or grants more than its steps need. Cross-check OpenSSF Scorecard Token-Permissions. Independent of detect (least-privilege judgment vs key presence)."
+    severity: HIGH
+    framework:
+      - openssf-scorecard   # Token-Permissions
+      - nist-ssdf           # PO.5 protect the build environment
+      - slsa                # Build L2 isolated, least-privilege build
+    liability_template:
+      user_harm: "A compromised step (malicious dependency, injected action) inherits write access to repo contents, releases, and packages - enabling supply-chain injection or secret exfiltration."
+      legal_exposure: "Reasonable-security failure; SLSA build-integrity gap; SOC 2 CC6.1 logical-access controls."
+
+  # ═══════════════════════ CATEGORY 6: OPERATIONAL ═══════════════════════
+
+  - id: op-missing-security-md
+    last_verified: "2026-05-25"
+    category: operational
+    question: "Does the repository have a SECURITY.md with vulnerability disclosure contact and policy?"
+    detect:
+      - "structural: absence of SECURITY.md at repo root or .github/SECURITY.md"
+    verify: "Check for SECURITY.md in expected locations."
+    severity: MEDIUM
+    framework:
+      - openssf-scorecard  # 'Security-Policy' check
+      - nist-csf-2
+    liability_template:
+      user_harm: "Security researchers have no channel for responsible disclosure. Increases probability of public 0-day."
+
+  - id: op-stack-trace-leakage
+    last_verified: "2026-05-25"
+    category: operational
+    question: "Do production error responses leak stack traces, internal paths, or framework details?"
+    detect:
+      - "(?i)debug\\s*[=:]\\s*(true|1)"
+      - "app\\.use\\(.*errorHandler"
+    verify: "Read context. Confirm DEBUG=True or verbose error handler is in production-shipped code (not dev-only)."
+    severity: HIGH
+    framework:
+      - owasp-top10-2021  # A05 Security Misconfiguration
+      - cwe-top25         # CWE-209
+    liability_template:
+      user_harm: "Attackers gain detailed knowledge of the application stack, library versions, file paths - accelerating exploitation."
+      legal_exposure: "Failure-to-secure under GDPR Art. 32, CCPA reasonable security."
+
+  - id: op-no-rate-limit
+    last_verified: "2026-05-25"
+    category: operational
+    question: "Are authentication endpoints (login, password reset, signup) rate-limited?"
+    detect:
+      - "structural: routes matching /login /signin /signup /forgot /reset without rate-limit middleware"
+    verify: "Walk the route handler. Confirm presence of rate-limit / throttle / brute-force-protection middleware."
+    severity: HIGH
+    framework:
+      - owasp-top10-2021  # A07 Identification & Auth Failures
+      - owasp-asvs-v4     # V2.2.1 anti-automation
+    liability_template:
+      user_harm: "Credential stuffing, brute force, account enumeration become trivial."
+      legal_exposure: "FTC has named missing rate limiting as 'unreasonable security' (Wyndham 2015 et seq.)."
+
+  # ═══════════════════════ EPISTEMIC (original t-b-v doctrine) ═══════════════════════
+
+  - id: epi-hedged-language
+    last_verified: "2026-05-25"
+    category: epistemic
+    question: "Does the artifact contain hedged language (probably, should work, might, TODO-verify) in active assertions?"
+    detect:
+      - '\b(probably|should work|i (think|believe)|might (work|be)|seems? to|TODO\s*verify|FIXME)\b'
+    verify: "Read 5 lines context. Drop if past-tense / test name / quoted historical reasoning. Keep if in active assertion."
+    severity: MEDIUM
+    framework:
+      - in-repo: "trust-but-verify UNCERTAINTY PROTOCOL"
+
+  - id: epi-unverified-external
+    last_verified: "2026-05-25"
+    category: epistemic
+    question: "Does the artifact assert an external URL / version pin / API endpoint without verification against the source registry?"
+    detect:
+      - 'https?://[^\s"''`)>\]]+'
+    verify: "WebFetch the URL. HTTP 200/204 = verified. 404 = finding. 3xx = update to canonical. For npm/PyPI paths, cross-check against registry."
+    severity: HIGH
+    framework:
+      - in-repo: "trust-but-verify UNCERTAINTY PROTOCOL"
+
+  - id: epi-state-mutation-no-readback
+    last_verified: "2026-05-25"
+    category: epistemic
+    question: "Does code mutate state (file, DB, shell) without a subsequent state-check read?"
+    detect:
+      - 'fs\.write(File|FileSync)\(.+\)$'
+      - 'exec\("git \w+'
+      - '\.update\(|\.insert\(|\.delete\('
+    verify: "Read 30 lines downstream. Drop if a read-back / status check appears."
+    severity: HIGH
+    framework:
+      - in-repo: "trust-but-verify UNCERTAINTY PROTOCOL (founding principle)"

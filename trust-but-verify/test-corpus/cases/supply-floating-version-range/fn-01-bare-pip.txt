@@ -1,0 +1,3 @@
+# trust-but-verify corpus specimen. Label + rationale: test-corpus/manifest.yaml
+flask==2.3.0
+requests

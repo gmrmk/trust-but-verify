@@ -1,0 +1,384 @@
+# manifest.yaml (structural) - mini-repo ground truth for structural/tool-call branches.
+#
+# Validate with: python test-corpus/structural/score_structural.py
+# Each `dir` is a mini-repo; detection is the Python predicate registered for the
+# branch in score_structural.py (NOT a regex). Same label-consistency invariants
+# as the regex corpus: TP/FP/FN-B fire; TN/FN-A stay silent.
+
+corpus_version: 0.2.0
+kind: structural
+coverage:
+  structural_branches_total: 10
+  branches_with_cases: 10
+  cases_total: 40
+  by_expected_label:
+    true_positive: 10
+    false_positive: 10
+    false_negative: 10
+    true_negative: 10
+cases:
+- id: supply-lockfile-missing/tp-01-no-lock
+  branch: supply-lockfile-missing
+  dir: cases/supply-lockfile-missing/tp-01-no-lock
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: HIGH
+  fn_class: n/a
+  notes: package.json with dependencies but no lockfile committed. Predicate fires; verify confirms no
+    lockfile of any manager.
+- id: supply-lockfile-missing/fp-01-stub-no-deps
+  branch: supply-lockfile-missing
+  dir: cases/supply-lockfile-missing/fp-01-stub-no-deps
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  fn_class: n/a
+  edge_case: A config-only package.json with zero dependencies and no lockfile. The structural predicate
+    fires (manifest present, no lock), but there is nothing to pin; verify must drop.
+  notes: Predicate fires; verify drops because the manifest declares no dependencies.
+- id: supply-lockfile-missing/tn-01-locked
+  branch: supply-lockfile-missing
+  dir: cases/supply-lockfile-missing/tn-01-locked
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  fn_class: n/a
+  notes: package.json + package-lock.json. Predicate correctly silent.
+- id: supply-lockfile-missing/fn-01-gemfile
+  branch: supply-lockfile-missing
+  dir: cases/supply-lockfile-missing/fn-01-gemfile
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: HIGH
+  fn_class: FN-A
+  edge_case: A Ruby Gemfile with no Gemfile.lock - a real missing-lockfile, but the predicate's manifest
+    map does not include Gemfile, so it never fires.
+  notes: 'FN-A: manifest-type gap in the structural check.'
+- id: op-missing-security-md/tp-01-absent
+  branch: op-missing-security-md
+  dir: cases/op-missing-security-md/tp-01-absent
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: MEDIUM
+  fn_class: n/a
+  notes: No SECURITY.md anywhere. Predicate fires; verify confirms no disclosure policy.
+- id: op-missing-security-md/fp-01-alt-location
+  branch: op-missing-security-md
+  dir: cases/op-missing-security-md/fp-01-alt-location
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  fn_class: n/a
+  edge_case: A disclosure policy exists at docs/security.md (not the canonical SECURITY.md or .github/SECURITY.md).
+    The predicate fires, but a policy DOES exist; verify must drop.
+  notes: Predicate fires on the canonical-path miss; verify drops on the alternate-location policy.
+- id: op-missing-security-md/tn-01-present
+  branch: op-missing-security-md
+  dir: cases/op-missing-security-md/tn-01-present
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  fn_class: n/a
+  notes: SECURITY.md present at root with real content. Predicate correctly silent.
+- id: op-missing-security-md/fn-01-empty-stub
+  branch: op-missing-security-md
+  dir: cases/op-missing-security-md/fn-01-empty-stub
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: MEDIUM
+  fn_class: FN-A
+  edge_case: SECURITY.md exists but is EMPTY - effectively no policy. The presence-only predicate sees
+    the file and stays silent, missing the real gap.
+  notes: 'FN-A: the structural check tests presence, not content.'
+- id: license-missing-attribution/tp-01-vendor-no-notice
+  branch: license-missing-attribution
+  dir: cases/license-missing-attribution/tp-01-vendor-no-notice
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: MEDIUM
+  fn_class: n/a
+  notes: A vendored Apache-2.0 dependency with no NOTICE/CREDITS at root. Predicate fires; verify confirms
+    attribution is required and absent.
+- id: license-missing-attribution/fp-01-cc0
+  branch: license-missing-attribution
+  dir: cases/license-missing-attribution/fp-01-cc0
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  fn_class: n/a
+  edge_case: The vendored LICENSE is CC0 / public-domain, which requires NO attribution. The predicate
+    fires (it sees a vendored LICENSE + no NOTICE) but cannot read the license type; verify must drop.
+  notes: Predicate fires; verify drops because CC0 needs no attribution.
+- id: license-missing-attribution/tn-01-with-notice
+  branch: license-missing-attribution
+  dir: cases/license-missing-attribution/tn-01-with-notice
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  fn_class: n/a
+  notes: Vendored Apache-2.0 dependency WITH a root NOTICE crediting it. Predicate correctly silent.
+- id: license-missing-attribution/fn-01-inline-asset
+  branch: license-missing-attribution
+  dir: cases/license-missing-attribution/fn-01-inline-asset
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: MEDIUM
+  fn_class: FN-A
+  edge_case: An MIT-licensed asset is embedded directly under src/embedded/ (not vendor/ or third_party/)
+    with no NOTICE. The predicate only scans vendor/third_party, so it never fires.
+  notes: 'FN-A: attribution-required asset outside the scanned directories.'
+- id: license-dep-conflict/tp-01-gpl-in-mit
+  branch: license-dep-conflict
+  dir: cases/license-dep-conflict/tp-01-gpl-in-mit
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: HIGH
+  fn_class: n/a
+  notes: A GPL-3.0 dependency in an MIT project. Predicate fires; verify confirms the copyleft conflict.
+- id: license-dep-conflict/fp-01-dual-license
+  branch: license-dep-conflict
+  dir: cases/license-dep-conflict/fp-01-dual-license
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  fn_class: n/a
+  edge_case: The dependency is dual-licensed '(MIT OR GPL-3.0)' so MIT can be chosen. The naive substring
+    predicate sees 'GPL' and fires; verify must drop on the OR-expression.
+  notes: Predicate fires on the GPL substring; verify drops because the MIT option is available.
+- id: license-dep-conflict/tn-01-all-permissive
+  branch: license-dep-conflict
+  dir: cases/license-dep-conflict/tn-01-all-permissive
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  fn_class: n/a
+  notes: All dependencies permissive (Apache-2.0). Predicate correctly silent.
+- id: license-dep-conflict/fn-01-license-file-only
+  branch: license-dep-conflict
+  dir: cases/license-dep-conflict/fn-01-license-file-only
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: HIGH
+  fn_class: FN-A
+  edge_case: A GPL dependency whose license is declared only in a LICENSE file, not the package.json 'license'
+    field. The predicate reads the manifest field and misses it.
+  notes: 'FN-A: license declared outside the scanned manifest field.'
+- id: a11y-color-contrast/tp-01-low-contrast
+  branch: a11y-color-contrast
+  dir: cases/a11y-color-contrast/tp-01-low-contrast
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: MEDIUM
+  fn_class: n/a
+  notes: '#777 on #999 is ~1.6:1, far below AA. Predicate computes the ratio and fires.'
+- id: a11y-color-contrast/fp-01-large-text
+  branch: a11y-color-contrast
+  dir: cases/a11y-color-contrast/fp-01-large-text
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  fn_class: n/a
+  edge_case: '#888 on #fff is ~3.4:1 - below the 4.5:1 normal-text threshold the predicate uses, so it
+    fires; but the text is large (2rem/700), where AA''s threshold is 3:1 and it passes. Verify must drop.'
+  notes: Predicate fires at the 4.5 threshold; verify drops because large text uses the 3:1 threshold.
+- id: a11y-color-contrast/tn-01-high-contrast
+  branch: a11y-color-contrast
+  dir: cases/a11y-color-contrast/tn-01-high-contrast
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  fn_class: n/a
+  notes: '#000 on #fff is 21:1. Predicate correctly silent.'
+- id: a11y-color-contrast/fn-01-rgb-colors
+  branch: a11y-color-contrast
+  dir: cases/a11y-color-contrast/fn-01-rgb-colors
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: MEDIUM
+  fn_class: FN-A
+  edge_case: 'A low-contrast pair specified with rgb() instead of hex; the predicate only parses #hex
+    colours so it never fires.'
+  notes: 'FN-A: colour-format gap (rgb() not parsed).'
+- id: supply-known-cve-deps/tp-01-high-vulns
+  branch: supply-known-cve-deps
+  dir: cases/supply-known-cve-deps/tp-01-high-vulns
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: HIGH
+  fn_class: n/a
+  notes: Captured npm audit reports high+critical vulnerabilities. Predicate fires.
+- id: supply-known-cve-deps/fp-01-low-only
+  branch: supply-known-cve-deps
+  dir: cases/supply-known-cve-deps/fp-01-low-only
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  fn_class: n/a
+  edge_case: Captured audit reports only low/info advisories. The predicate fires on any vulnerability;
+    verify drops below the actionable CVSS threshold.
+  notes: Predicate fires on total>0; verify drops because only low-severity advisories are present.
+- id: supply-known-cve-deps/tn-01-clean
+  branch: supply-known-cve-deps
+  dir: cases/supply-known-cve-deps/tn-01-clean
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  fn_class: n/a
+  notes: Captured audit reports zero vulnerabilities. Predicate correctly silent.
+- id: supply-known-cve-deps/fn-01-vendored-bundle
+  branch: supply-known-cve-deps
+  dir: cases/supply-known-cve-deps/fn-01-vendored-bundle
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: HIGH
+  fn_class: FN-A
+  edge_case: A known-vulnerable library is vendored as a bundled .min.js, outside any manifest npm audit
+    scans, so the captured report is clean and the predicate stays silent.
+  notes: 'FN-A: the tool does not scan vendored bundles.'
+- id: priv-no-data-rights/tp-01-no-erasure
+  branch: priv-no-data-rights
+  dir: cases/priv-no-data-rights/tp-01-no-erasure
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: HIGH
+  fn_class: n/a
+  notes: User CRUD routes with no deletion or export endpoint. Predicate fires; verify confirms no GDPR
+    Art.17/20 path.
+- id: priv-no-data-rights/fp-01-telemetry
+  branch: priv-no-data-rights
+  dir: cases/priv-no-data-rights/fp-01-telemetry
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  fn_class: n/a
+  edge_case: Routes mention 'user-agent' telemetry (matches the PII heuristic) but store no personal data;
+    no deletion route exists. Predicate fires; verify drops because no PII is stored.
+  notes: Predicate fires on the 'user' token; verify drops because there is no PII to erase.
+- id: priv-no-data-rights/tn-01-full-rights
+  branch: priv-no-data-rights
+  dir: cases/priv-no-data-rights/tn-01-full-rights
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  fn_class: n/a
+  notes: User routes WITH a delete-account and an export endpoint. Predicate correctly silent.
+- id: priv-no-data-rights/fn-01-stub-delete
+  branch: priv-no-data-rights
+  dir: cases/priv-no-data-rights/fn-01-stub-delete
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: HIGH
+  fn_class: FN-A
+  edge_case: A /delete-account route exists but its handler returns 501 Not Implemented. The predicate
+    sees the route and stays silent, missing that erasure does not actually work.
+  notes: 'FN-A: the check tests route presence, not that the handler functions.'
+- id: priv-pii-plaintext/tp-01-plaintext-ssn
+  branch: priv-pii-plaintext
+  dir: cases/priv-pii-plaintext/tp-01-plaintext-ssn
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: HIGH
+  fn_class: n/a
+  notes: An ssn column typed VARCHAR with no encryption marker. Predicate fires.
+- id: priv-pii-plaintext/fp-01-product-phone
+  branch: priv-pii-plaintext
+  dir: cases/priv-pii-plaintext/fp-01-product-phone
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  fn_class: n/a
+  edge_case: A 'phone_model' column in a products table matches the PII 'phone' pattern and is VARCHAR,
+    so the predicate fires; but it is a device attribute, not PII. Verify must drop.
+  notes: Predicate fires on the 'phone' substring; verify drops because the column is not personal data.
+- id: priv-pii-plaintext/tn-01-encrypted
+  branch: priv-pii-plaintext
+  dir: cases/priv-pii-plaintext/tn-01-encrypted
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  fn_class: n/a
+  notes: PII columns stored as BYTEA with an encryption marker. Predicate correctly silent.
+- id: priv-pii-plaintext/fn-01-json-blob
+  branch: priv-pii-plaintext
+  dir: cases/priv-pii-plaintext/fn-01-json-blob
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: HIGH
+  fn_class: FN-A
+  edge_case: PII (email, ssn) is nested inside a JSONB 'profile' column; the predicate scans column names/types
+    and cannot introspect the blob, so it never fires.
+  notes: 'FN-A: PII hidden inside a JSON/blob column.'
+- id: op-no-rate-limit/tp-01-bare-login
+  branch: op-no-rate-limit
+  dir: cases/op-no-rate-limit/tp-01-bare-login
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: HIGH
+  fn_class: n/a
+  notes: A /login (and /signup) route with no rate-limit middleware. Predicate fires.
+- id: op-no-rate-limit/fp-01-global-limiter
+  branch: op-no-rate-limit
+  dir: cases/op-no-rate-limit/fp-01-global-limiter
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  fn_class: n/a
+  edge_case: The /login route file has no inline limiter, but a global rate limiter is applied in app.js.
+    The predicate scans only the route file and fires; verify drops on the global middleware.
+  notes: Predicate fires on the route file; verify drops because a global limiter covers it.
+- id: op-no-rate-limit/tn-01-inline-limiter
+  branch: op-no-rate-limit
+  dir: cases/op-no-rate-limit/tn-01-inline-limiter
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  fn_class: n/a
+  notes: The /login route applies an inline rateLimit middleware. Predicate correctly silent.
+- id: op-no-rate-limit/fn-01-aliased-endpoint
+  branch: op-no-rate-limit
+  dir: cases/op-no-rate-limit/fn-01-aliased-endpoint
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: HIGH
+  fn_class: FN-A
+  edge_case: Authentication via a POST /api/session endpoint (login by another name) with no limiter;
+    the predicate's auth-route pattern does not match 'session', so it never fires.
+  notes: 'FN-A: auth endpoint named outside the recognized keyword set.'
+- id: supply-actions-excessive-permissions/tp-01-no-permissions
+  branch: supply-actions-excessive-permissions
+  dir: cases/supply-actions-excessive-permissions/tp-01-no-permissions
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: HIGH
+  fn_class: n/a
+  notes: 'A workflow with no permissions: block uses a third-party action; it inherits the repo''s default
+    token scope (often write). Predicate fires; verify confirms least-privilege is absent.'
+- id: supply-actions-excessive-permissions/fp-01-trivial-echo
+  branch: supply-actions-excessive-permissions
+  dir: cases/supply-actions-excessive-permissions/fp-01-trivial-echo
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  fn_class: n/a
+  edge_case: 'The workflow has no permissions: block (predicate fires) but only runs `echo` - it never
+    uses GITHUB_TOKEN, so the broad default is harmless. Verify must drop.'
+  notes: Predicate fires on the missing block; verify drops because no step uses the token.
+- id: supply-actions-excessive-permissions/tn-01-least-privilege
+  branch: supply-actions-excessive-permissions
+  dir: cases/supply-actions-excessive-permissions/tn-01-least-privilege
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  fn_class: n/a
+  notes: 'An explicit top-level `permissions: contents: read` block. Predicate correctly silent.'
+- id: supply-actions-excessive-permissions/fn-01-job-override
+  branch: supply-actions-excessive-permissions
+  dir: cases/supply-actions-excessive-permissions/fn-01-job-override
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: HIGH
+  fn_class: FN-A
+  edge_case: 'The top-level block is least-privilege (contents: read), but a job silently escalates to
+    contents: write. The predicate sees a permissions: block present and stays silent, missing the per-job
+    escalation.'
+  notes: 'FN-A: the check tests for a permissions block''s presence, not per-job over-grants.'

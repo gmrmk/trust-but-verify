@@ -1,0 +1,797 @@
+# manifest.yaml - labeled ground truth for the trust-but-verify synthetic corpus.
+#
+# Machine-scorable source of truth. See README.md for the schema, the
+# precision/recall tradeoff doctrine, and the FN taxonomy. Validate with
+# `python test-corpus/score.py` (detection-layer harness).
+#
+# Fixtures carry ONLY a neutral header + the specimen; all rationale lives here,
+# so a fixture's own documentation can never contaminate its detection.
+#
+# expected_label semantics (CORRECT skill behavior on this case):
+#   true_positive   - detect fires, issue is real        -> recall + precision
+#   true_negative   - detect silent, code is clean        -> specificity
+#   false_positive  - detect fires, code benign           -> verify MUST drop (precision stress)
+#   false_negative  - real issue the skill misses         -> documents the recall cost (FN-A/B/...)
+
+corpus_version: 0.2.0
+coverage:
+  branches_total: 27
+  branches_with_cases: 17
+  cases_total: 72
+  by_expected_label:
+    true_positive: 18
+    false_positive: 18
+    false_negative: 19
+    true_negative: 17
+  edge_cases: 37
+  fn_classes_exercised:
+  - FN-A
+  - FN-B
+cases:
+- id: sec-sql-injection/tp-01-template-literal
+  branch: sec-sql-injection
+  file: cases/sec-sql-injection/tp-01-template-literal.js
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: CRITICAL
+  second_signal_available: true
+  fn_class: n/a
+  notes: User input interpolated inline into the query() template literal. detect regex matches; verify
+    confirms no parameterization.
+- id: sec-sql-injection/tn-01-parameterized
+  branch: sec-sql-injection
+  file: cases/sec-sql-injection/tn-01-parameterized.js
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  notes: 'Parameterized query: the SQL string has a ? placeholder and no interpolation, so the detect
+    regex never fires. Clean code the detector correctly leaves alone (was previously mislabeled false_positive;
+    the regex is silent on it).'
+- id: sec-sql-injection/fn-01-cross-function-taint
+  branch: sec-sql-injection
+  file: cases/sec-sql-injection/fn-01-cross-function-taint.js
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: CRITICAL
+  second_signal_available: false
+  fn_class: FN-B
+  edge_case: The sink interpolates filter.where inline (detect fires), but filter is a param built by
+    collectFilters(req) ~40 lines away; the 20-line verify window cannot trace the taint to user input
+    and over-drops.
+  notes: 'Genuine FN-B: detection fires on the inline interpolation, but the verify step''s context window
+    cannot prove the value is user-controlled.'
+- id: sec-sql-injection/edge-01-constant-interpolation
+  branch: sec-sql-injection
+  file: cases/sec-sql-injection/edge-01-constant-interpolation.js
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  edge_case: 'Template literal with an interpolation (detect fires), but the interpolated value is a module-level
+    constant, not user input; verify must drop. Tests the detect over-match boundary: an interpolation
+    is not injection.'
+  notes: Detect over-match boundary case.
+- id: sec-xss/tp-01-dangerously-set
+  branch: sec-xss
+  file: cases/sec-xss/tp-01-dangerously-set.jsx
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: HIGH
+  second_signal_available: true
+  fn_class: n/a
+  notes: dangerouslySetInnerHTML fed from attacker-controlled stored HTML with no sanitizer in context.
+    detect fires; verify confirms.
+- id: sec-xss/fp-01-event-handler-binding
+  branch: sec-xss
+  file: cases/sec-xss/fp-01-event-handler-binding.jsx
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  edge_case: innerHTML is assigned a request-derived value inline (the req.body token is on the innerHTML
+    line, so the detect regex fires), but that value is wrapped in a vetted sanitizer; verify must drop
+    on the sanitizer second signal.
+  notes: detect fires on innerHTML = sanitizeHtml(req.body...); verify drops because the value is sanitized
+    inline.
+- id: sec-xss/tn-01-text-content
+  branch: sec-xss
+  file: cases/sec-xss/tn-01-text-content.jsx
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  notes: Renders a user value as a JSX text child; no innerHTML, dangerouslySetInnerHTML, or document.write.
+    React auto-escapes. The detect regex never fires.
+- id: sec-xss/fn-01-misconfigured-sanitizer
+  branch: sec-xss
+  file: cases/sec-xss/fn-01-misconfigured-sanitizer.jsx
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: HIGH
+  second_signal_available: false
+  fn_class: FN-B
+  edge_case: A sanitizer is present and called (so the verify 'sanitizer found' signal over-drops), but
+    its config re-enables event-handler attributes, so the output is still bypassable. The vuln is in
+    the config, not the absence of a sanitizer.
+  notes: 'FN-B semantic over-drop: sanitizer presence != sanitizer correctness.'
+- id: supply-actions-floating-tag/tp-01-checkout-v4
+  branch: supply-actions-floating-tag
+  file: cases/supply-actions-floating-tag/tp-01-checkout-v4.yml
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: HIGH
+  second_signal_available: true
+  fn_class: n/a
+  notes: Floating major tag (@v4), silently re-pointable. detect fires; verify confirms it is not a 40-char
+    SHA.
+- id: supply-actions-floating-tag/fp-01-commented-step
+  branch: supply-actions-floating-tag
+  file: cases/supply-actions-floating-tag/fp-01-commented-step.yml
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  edge_case: A commented-out step contains a floating @v2 tag, so the detect regex matches it - but it
+    is a comment, not an active step; verify must drop. The active steps are SHA-pinned.
+  notes: detect fires on a floating tag inside a comment; verify drops because the line is commented out.
+- id: supply-actions-floating-tag/tn-01-sha-pinned
+  branch: supply-actions-floating-tag
+  file: cases/supply-actions-floating-tag/tn-01-sha-pinned.yml
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  notes: All actions pinned to 40-char commit SHAs. The detect regex (which matches @vN tags) never fires.
+    Clean (was previously mislabeled false_positive; the regex is silent on a SHA ref).
+- id: supply-actions-floating-tag/fn-01-docker-latest
+  branch: supply-actions-floating-tag
+  file: cases/supply-actions-floating-tag/fn-01-docker-latest.yml
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: HIGH
+  second_signal_available: false
+  fn_class: FN-A
+  notes: 'FN-A: detection form-gap. The docker:// syntax is unmodeled by THIS branch''s @vN regex, so
+    floating-tag still misses it. The risk itself is now CAUGHT by the promoted supply-unpinned-base-image
+    branch (see its tp-02-docker-latest) - this case documents the floating-tag branch''s own remaining
+    reach gap.'
+  edge_case: A docker:// action on a :latest tag. Still missed by floating-tag's owner/repo@vN regex (a
+    real per-branch gap), but now covered at the skill level by supply-unpinned-base-image's docker://
+    pattern.
+- id: supply-actions-floating-tag/edge-01-semver-tag
+  branch: supply-actions-floating-tag
+  file: cases/supply-actions-floating-tag/edge-01-semver-tag.yml
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: HIGH
+  second_signal_available: false
+  fn_class: FN-A
+  edge_case: actions/checkout@v4.2.2 is still unpinned (a mutable tag, not a 40-char SHA) but the regex
+    matches only a bare major tag at line end; the trailing .2.2 defeats the anchor, so detection misses
+    it.
+  notes: 'FN-A: regex-too-strict. A full semver tag is unpinned yet slips the bare-major-tag pattern.'
+- id: sec-hardcoded-secret/tp-01-generic-password
+  branch: sec-hardcoded-secret
+  file: cases/sec-hardcoded-secret/tp-01-generic-password.py
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: CRITICAL
+  second_signal_available: true
+  fn_class: n/a
+  notes: Hardcoded password literal (>=6 chars), not a placeholder. detect fires; verify confirms it is
+    not a placeholder. SYNTHETIC value.
+- id: sec-hardcoded-secret/fp-01-placeholder
+  branch: sec-hardcoded-secret
+  file: cases/sec-hardcoded-secret/fp-01-placeholder.py
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  notes: The password regex matches, but the value is a literal placeholder string; verify must drop.
+- id: sec-hardcoded-secret/edge-01-aws-example-key
+  branch: sec-hardcoded-secret
+  file: cases/sec-hardcoded-secret/edge-01-aws-example-key.py
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  edge_case: AWS's documented example key matches the AKIA[A-Z0-9]{16} form exactly so detection fires;
+    verify must drop on the EXAMPLE placeholder token the regex cannot see.
+  notes: 'Edge: a well-known non-secret the detect regex treats as a real key.'
+- id: sec-hardcoded-secret/tn-01-env-var
+  branch: sec-hardcoded-secret
+  file: cases/sec-hardcoded-secret/tn-01-env-var.py
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  notes: Credential read from the environment at runtime - no hardcoded literal. No prefix or keyword
+    regex matches. Clean.
+- id: sec-hardcoded-secret/fn-01-base64-credential
+  branch: sec-hardcoded-secret
+  file: cases/sec-hardcoded-secret/fn-01-base64-credential.py
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: CRITICAL
+  second_signal_available: false
+  fn_class: FN-A
+  edge_case: A real credential, base64-encoded and bound to a var with no password/secret keyword; none
+    of the prefix or keyword regexes match. SYNTHETIC value.
+  notes: 'FN-A: format not modeled.'
+- id: a11y-missing-alt/tp-01-no-alt
+  branch: a11y-missing-alt
+  file: cases/a11y-missing-alt/tp-01-no-alt.html
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: MEDIUM
+  second_signal_available: true
+  fn_class: n/a
+  notes: Content image with no alt attribute; the figcaption shows it is content-bearing. detect fires;
+    verify confirms.
+- id: a11y-missing-alt/fp-01-presentation-role
+  branch: a11y-missing-alt
+  file: cases/a11y-missing-alt/fp-01-presentation-role.html
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  edge_case: An image with role=presentation but no alt - the detect regex fires (no alt= attribute),
+    but role=presentation removes it from the accessibility tree, so it is correctly decorative; verify
+    must drop.
+  notes: detect fires on missing alt; verify drops on the explicit decorative role.
+- id: a11y-missing-alt/tn-01-decorative-empty-alt
+  branch: a11y-missing-alt
+  file: cases/a11y-missing-alt/tn-01-decorative-empty-alt.html
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  notes: Decorative image with an empty alt - the correct pattern. The negative-lookahead regex sees the
+    alt attribute and does not match. Detection correctly silent.
+- id: a11y-missing-alt/edge-01-data-alt-attr
+  branch: a11y-missing-alt
+  file: cases/a11y-missing-alt/edge-01-data-alt-attr.html
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: MEDIUM
+  second_signal_available: false
+  fn_class: FN-A
+  edge_case: The image has a data-alt attribute but no real alt. The negative lookahead treats the alt
+    fragment inside data-alt as a real attribute (word boundary before it) and wrongly clears the image.
+    Detection over-clears.
+  notes: 'FN-A: negative-lookahead imprecision; the regex cannot tell the decoy attribute from a real
+    alt.'
+- id: a11y-missing-alt/edge-02-uppercase-img
+  branch: a11y-missing-alt
+  file: cases/a11y-missing-alt/edge-02-uppercase-img.html
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: MEDIUM
+  second_signal_available: false
+  fn_class: FN-A
+  edge_case: An uppercase image tag with no alt. The detect regex is case-sensitive (no ignore-case flag)
+    so it never matches the uppercase element.
+  notes: 'FN-A: casing miss.'
+- id: epi-hedged-language/tp-01-active-assertion
+  branch: epi-hedged-language
+  file: cases/epi-hedged-language/tp-01-active-assertion.md
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: MEDIUM
+  second_signal_available: true
+  fn_class: n/a
+  notes: A hedged phrase in an active present-tense assertion about current behavior. detect fires; verify
+    keeps it (not past-tense, not a quote, not a test name).
+- id: epi-hedged-language/fp-01-historical-quote
+  branch: epi-hedged-language
+  file: cases/epi-hedged-language/fp-01-historical-quote.md
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  edge_case: A hedge word appears inside past-tense historical reasoning, which the verify rule explicitly
+    drops. detect fires on the word; verify must drop on the past-tense context.
+  notes: Tests the verify context rule, not the regex.
+- id: epi-hedged-language/tn-01-confident-cited
+  branch: epi-hedged-language
+  file: cases/epi-hedged-language/tn-01-confident-cited.md
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  notes: A confident, evidence-backed assertion with no hedge words. The detect regex never fires.
+- id: epi-hedged-language/fn-01-synonym
+  branch: epi-hedged-language
+  file: cases/epi-hedged-language/fn-01-synonym.md
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: MEDIUM
+  second_signal_available: false
+  fn_class: FN-A
+  edge_case: The hedge is expressed with a phrase that is outside the detect word list, so a genuinely
+    hedged active claim is never matched.
+  notes: 'FN-A: word-list coverage gap (synonym).'
+- id: sec-weak-crypto/tp-01-md5-password
+  branch: sec-weak-crypto
+  file: cases/sec-weak-crypto/tp-01-md5-password.py
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: HIGH
+  second_signal_available: true
+  fn_class: n/a
+  notes: md5 used to hash a password. detect fires; verify confirms a password use (CWE-327).
+- id: sec-weak-crypto/fp-01-md5-checksum
+  branch: sec-weak-crypto
+  file: cases/sec-weak-crypto/fp-01-md5-checksum.py
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  edge_case: md5 used for a non-security file-integrity / cache key; the branch verify explicitly drops
+    non-security checksum uses. detect fires; verify must drop.
+  notes: 'Edge: non-security checksum use of a weak hash.'
+- id: sec-weak-crypto/tn-01-bcrypt
+  branch: sec-weak-crypto
+  file: cases/sec-weak-crypto/tn-01-bcrypt.py
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  notes: Password hashed with bcrypt (a strong adaptive hash); no md5/sha1 call, so the detect regex never
+    fires.
+- id: sec-weak-crypto/fn-01-aliased-import
+  branch: sec-weak-crypto
+  file: cases/sec-weak-crypto/fn-01-aliased-import.py
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: HIGH
+  second_signal_available: false
+  fn_class: FN-A
+  edge_case: md5 is imported under an alias, so the call site does not match the literal module.method(
+    regex. A real weak password hash slips detection.
+  notes: 'FN-A: aliased-import miss.'
+- id: sec-broken-access-control/tp-01-idor-findbyid
+  branch: sec-broken-access-control
+  file: cases/sec-broken-access-control/tp-01-idor-findbyid.js
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: CRITICAL
+  second_signal_available: true
+  fn_class: n/a
+  notes: findById on a request-supplied id with no ownership check. detect fires; verify finds no authz
+    guarding the resource.
+- id: sec-broken-access-control/fp-01-ownership-checked
+  branch: sec-broken-access-control
+  file: cases/sec-broken-access-control/fp-01-ownership-checked.js
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  edge_case: findById(req.params.id) fires the regex, but the very next line verifies the caller owns
+    the resource; verify must drop.
+  notes: detect fires; verify drops on the ownership check.
+- id: sec-broken-access-control/tn-01-own-id
+  branch: sec-broken-access-control
+  file: cases/sec-broken-access-control/tn-01-own-id.js
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  notes: Lookup keyed on the authenticated user's own id (req.user.id), not a params/body/query value,
+    so the regex never fires.
+- id: sec-broken-access-control/fn-01-findone-query
+  branch: sec-broken-access-control
+  file: cases/sec-broken-access-control/fn-01-findone-query.js
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: CRITICAL
+  second_signal_available: false
+  fn_class: FN-A
+  edge_case: A real IDOR via a query builder (findOne with a request id) and no ownership check, but the
+    access pattern is not findById/getById so the regex never fires.
+  notes: 'FN-A: access-pattern gap (query builder instead of findById).'
+- id: sec-ssrf/tp-01-user-url
+  branch: sec-ssrf
+  file: cases/sec-ssrf/tp-01-user-url.js
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: HIGH
+  second_signal_available: true
+  fn_class: n/a
+  notes: fetch of a fully request-controlled URL with no allowlist. detect fires; verify confirms the
+    host is attacker-chosen.
+- id: sec-ssrf/fp-01-fixed-host
+  branch: sec-ssrf
+  file: cases/sec-ssrf/fp-01-fixed-host.js
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  edge_case: fetch(...req...) fires the regex, but only a path id is interpolated into a fixed, trusted
+    host; verify must drop (not host-controlled).
+  notes: detect fires on the req token; verify drops because the host is constant.
+- id: sec-ssrf/tn-01-config-url
+  branch: sec-ssrf
+  file: cases/sec-ssrf/tn-01-config-url.js
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  notes: fetch of a static configured upstream URL; no request value on the fetch line, so the regex never
+    fires.
+- id: sec-ssrf/fn-01-other-client
+  branch: sec-ssrf
+  file: cases/sec-ssrf/fn-01-other-client.js
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: HIGH
+  second_signal_available: false
+  fn_class: FN-A
+  edge_case: A real SSRF using a different HTTP client (got) on a request-controlled URL; the regex only
+    matches fetch/axios/urllib so detection never fires.
+  notes: 'FN-A: HTTP-client gap.'
+- id: priv-pii-in-logs/tp-01-email-logged
+  branch: priv-pii-in-logs
+  file: cases/priv-pii-in-logs/tp-01-email-logged.js
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: HIGH
+  second_signal_available: true
+  fn_class: n/a
+  notes: An email address concatenated into a log line. detect fires; verify confirms the logged value
+    is PII, not a redacted id.
+- id: priv-pii-in-logs/fp-01-user-count
+  branch: priv-pii-in-logs
+  file: cases/priv-pii-in-logs/fp-01-user-count.js
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  edge_case: The word 'user' triggers the regex, but the logged value is an aggregate count, not PII;
+    verify must drop.
+  notes: detect fires on the 'user' token; verify drops because the value is a count.
+- id: priv-pii-in-logs/tn-01-timing
+  branch: priv-pii-in-logs
+  file: cases/priv-pii-in-logs/tn-01-timing.js
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  notes: A latency log line containing no PII keyword, so the regex never fires.
+- id: priv-pii-in-logs/fn-01-synonym-field
+  branch: priv-pii-in-logs
+  file: cases/priv-pii-in-logs/fn-01-synonym-field.js
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: HIGH
+  second_signal_available: false
+  fn_class: FN-A
+  edge_case: 'A real PII leak: a contact address is logged, but via a field name outside the keyword list
+    (mail, not email/user), so detection never fires.'
+  notes: 'FN-A: PII field-name gap.'
+- id: a11y-form-no-labels/tp-01-bare-input
+  branch: a11y-form-no-labels
+  file: cases/a11y-form-no-labels/tp-01-bare-input.html
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: MEDIUM
+  second_signal_available: true
+  fn_class: n/a
+  notes: A visible text input with no id and no aria-label. detect fires; verify confirms there is no
+    associated label.
+- id: a11y-form-no-labels/fp-01-hidden-input
+  branch: a11y-form-no-labels
+  file: cases/a11y-form-no-labels/fp-01-hidden-input.html
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  edge_case: A hidden CSRF input has no id/aria-label so the regex fires, but hidden inputs are not user-perceivable
+    and need no label; verify must drop.
+  notes: detect fires on the unlabeled input; verify drops because type=hidden needs no label.
+- id: a11y-form-no-labels/tn-01-labelled
+  branch: a11y-form-no-labels
+  file: cases/a11y-form-no-labels/tn-01-labelled.html
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  notes: An input with an id paired to a label; the negative lookahead sees the id and the regex stays
+    silent.
+- id: a11y-form-no-labels/fn-01-broken-association
+  branch: a11y-form-no-labels
+  file: cases/a11y-form-no-labels/fn-01-broken-association.html
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: MEDIUM
+  second_signal_available: false
+  fn_class: FN-A
+  edge_case: The input has an id (so the regex clears it) but there is NO matching label element, so it
+    is effectively unlabelled. The regex checks for an id attribute, not for a real label association.
+  notes: 'FN-A: the regex clears on id presence without verifying the label linkage.'
+- id: op-stack-trace-leakage/tp-01-debug-true
+  branch: op-stack-trace-leakage
+  file: cases/op-stack-trace-leakage/tp-01-debug-true.py
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: HIGH
+  second_signal_available: true
+  fn_class: n/a
+  notes: Production settings ship with DEBUG = True, exposing stack traces. detect fires; verify confirms
+    this is the production config.
+- id: op-stack-trace-leakage/fp-01-dev-only
+  branch: op-stack-trace-leakage
+  file: cases/op-stack-trace-leakage/fp-01-dev-only.py
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  edge_case: DEBUG = True fires the regex, but this is a local-only settings file (localhost hosts) that
+    is never shipped; verify must drop.
+  notes: detect fires on DEBUG=True; verify drops on the dev-only context.
+- id: op-stack-trace-leakage/tn-01-debug-false
+  branch: op-stack-trace-leakage
+  file: cases/op-stack-trace-leakage/tn-01-debug-false.py
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  notes: Production settings with DEBUG = False; the regex (which matches true/1) never fires.
+- id: op-stack-trace-leakage/fn-01-raw-stack
+  branch: op-stack-trace-leakage
+  file: cases/op-stack-trace-leakage/fn-01-raw-stack.js
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: HIGH
+  second_signal_available: false
+  fn_class: FN-A
+  edge_case: 'A real stack-trace leak: the error handler sends err.stack to the client, but via a pattern
+    the two regexes (debug flag / errorHandler middleware) do not match.'
+  notes: 'FN-A: leak via a hand-rolled response, not a debug flag or named middleware.'
+- id: epi-unverified-external/tp-01-wrong-cdn-path
+  branch: epi-unverified-external
+  file: cases/epi-unverified-external/tp-01-wrong-cdn-path.md
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: HIGH
+  second_signal_available: true
+  fn_class: n/a
+  notes: A doc asserts a specific CDN file path as canonical; the URL is the load-bearing claim. detect
+    fires; verify (WebFetch) would confirm whether the path resolves.
+- id: epi-unverified-external/fp-01-example-domain
+  branch: epi-unverified-external
+  file: cases/epi-unverified-external/fp-01-example-domain.md
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  edge_case: The URL is on example.com (RFC 2606 reserved for documentation), so the regex fires but it
+    is a placeholder, not a real external dependency; verify must drop.
+  notes: detect fires on the URL; verify drops on the reserved documentation domain.
+- id: epi-unverified-external/tn-01-relative-links
+  branch: epi-unverified-external
+  file: cases/epi-unverified-external/tn-01-relative-links.md
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  notes: Documentation that references only in-repo relative paths; no external URL, so the regex never
+    fires.
+- id: epi-unverified-external/fn-01-bare-version-pin
+  branch: epi-unverified-external
+  file: cases/epi-unverified-external/fn-01-bare-version-pin.md
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: HIGH
+  second_signal_available: false
+  fn_class: FN-A
+  edge_case: An unverified external claim expressed as a bare package version pin with no URL form, so
+    the URL regex never fires.
+  notes: 'FN-A: version-pin assertion with no URL to match.'
+- id: epi-state-mutation-no-readback/tp-01-write-no-readback
+  branch: epi-state-mutation-no-readback
+  file: cases/epi-state-mutation-no-readback/tp-01-write-no-readback.js
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: HIGH
+  second_signal_available: true
+  fn_class: n/a
+  notes: A file is written and the function returns with no read-back to confirm the write landed. detect
+    fires; verify finds no downstream status check.
+- id: epi-state-mutation-no-readback/fp-01-update-then-read
+  branch: epi-state-mutation-no-readback
+  file: cases/epi-state-mutation-no-readback/fp-01-update-then-read.js
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  edge_case: A .update() call fires the regex, but the next line reads the record back to confirm the
+    mutation; verify must drop.
+  notes: detect fires on .update(; verify drops on the read-back.
+- id: epi-state-mutation-no-readback/tn-01-read-only
+  branch: epi-state-mutation-no-readback
+  file: cases/epi-state-mutation-no-readback/tn-01-read-only.js
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  notes: A pure read query with no mutation, so none of the write/exec/update/insert/delete patterns match.
+- id: epi-state-mutation-no-readback/fn-01-save-method
+  branch: epi-state-mutation-no-readback
+  file: cases/epi-state-mutation-no-readback/fn-01-save-method.js
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: HIGH
+  second_signal_available: false
+  fn_class: FN-A
+  edge_case: A real unverified mutation via an ORM .save() with no read-back, but .save( is outside the
+    update/insert/delete pattern set, so detection never fires.
+  notes: 'FN-A: mutation-method gap (.save()).'
+- id: supply-floating-version-range/tp-01-caret-range
+  branch: supply-floating-version-range
+  file: cases/supply-floating-version-range/tp-01-caret-range.json
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: MEDIUM
+  second_signal_available: true
+  fn_class: n/a
+  notes: A dependency pinned to a ^ caret range. The npm caret/tilde regex fires; verify confirms it is
+    a dependency (a fresh install can pull a new minor).
+- id: supply-floating-version-range/fp-01-engines-caret
+  branch: supply-floating-version-range
+  file: cases/supply-floating-version-range/fp-01-engines-caret.json
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  edge_case: The ^ range is on the engines.node constraint, not a dependency; the caret regex fires but
+    an engines floor is not a supply-chain pin. Verify must drop. Dependencies are exact.
+  notes: detect fires on the caret; verify drops because the caret governs an engines floor, not a dependency.
+- id: supply-floating-version-range/tn-01-exact
+  branch: supply-floating-version-range
+  file: cases/supply-floating-version-range/tn-01-exact.json
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  notes: All dependencies pinned to exact versions; no caret/tilde/wildcard, so the regex never fires.
+- id: supply-floating-version-range/fn-01-bare-pip
+  branch: supply-floating-version-range
+  file: cases/supply-floating-version-range/fn-01-bare-pip.txt
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: MEDIUM
+  second_signal_available: false
+  fn_class: FN-A
+  edge_case: A bare, unpinned pip requirement (no specifier at all) is the loosest possible pin, but the
+    regexes match a caret/tilde/>= operator that a bare name lacks, so detection never fires.
+  notes: 'FN-A: a fully-unpinned bare requirement slips the operator-based patterns.'
+- id: supply-install-scripts/tp-01-curl-bash
+  branch: supply-install-scripts
+  file: cases/supply-install-scripts/tp-01-curl-bash.dockerfile
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: HIGH
+  second_signal_available: true
+  fn_class: n/a
+  notes: A remote install script piped straight into a shell. The curl|sh regex fires; verify confirms
+    the source is remote and unpinned.
+- id: supply-install-scripts/fp-01-local-postinstall
+  branch: supply-install-scripts
+  file: cases/supply-install-scripts/fp-01-local-postinstall.json
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  edge_case: A postinstall lifecycle script fires the regex, but it runs a local build step (node ./scripts/...),
+    not remote code; verify must drop.
+  notes: detect fires on the postinstall script; verify drops because it runs a local, in-repo build.
+- id: supply-install-scripts/tn-01-clean
+  branch: supply-install-scripts
+  file: cases/supply-install-scripts/tn-01-clean.dockerfile
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  notes: Package installs via the distro package manager; no pipe-to-shell and no lifecycle script, so
+    the regex never fires.
+- id: supply-install-scripts/fn-01-command-subst
+  branch: supply-install-scripts
+  file: cases/supply-install-scripts/fn-01-command-subst.dockerfile
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: HIGH
+  second_signal_available: false
+  fn_class: FN-A
+  edge_case: Remote code is fetched and executed via shell command substitution rather than a pipe, so
+    the curl|sh pattern (which needs a literal pipe) never fires.
+  notes: 'FN-A: install-time exec via $(curl ...) command substitution, not a pipe.'
+- id: supply-unpinned-base-image/tp-01-latest
+  branch: supply-unpinned-base-image
+  file: cases/supply-unpinned-base-image/tp-01-latest.dockerfile
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: HIGH
+  second_signal_available: true
+  fn_class: n/a
+  notes: Base image on the mutable :latest tag. The :latest regex fires; verify confirms there is no @sha256
+    digest.
+- id: supply-unpinned-base-image/fp-01-scratch
+  branch: supply-unpinned-base-image
+  file: cases/supply-unpinned-base-image/fp-01-scratch.dockerfile
+  ground_truth: benign
+  expected_label: false_positive
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  edge_case: FROM scratch matches the no-digest regex, but `scratch` is the empty, immutable, non-pullable
+    base; there is nothing to pin. Verify must drop.
+  notes: detect fires on the digest-less FROM; verify drops because `scratch` is the special empty base.
+- id: supply-unpinned-base-image/tn-01-digest
+  branch: supply-unpinned-base-image
+  file: cases/supply-unpinned-base-image/tn-01-digest.dockerfile
+  ground_truth: benign
+  expected_label: true_negative
+  expected_severity: n/a
+  second_signal_available: true
+  fn_class: n/a
+  notes: Base image pinned to an immutable @sha256 digest; the no-digest regex backtracks at the @ and
+    never matches.
+- id: supply-unpinned-base-image/fn-01-compose-image
+  branch: supply-unpinned-base-image
+  file: cases/supply-unpinned-base-image/fn-01-compose-image.yml
+  ground_truth: vulnerable
+  expected_label: false_negative
+  expected_severity: HIGH
+  second_signal_available: false
+  fn_class: FN-A
+  edge_case: An unpinned :latest image declared in a docker-compose service, not a Dockerfile FROM; the
+    FROM-only regexes never see it.
+  notes: 'FN-A: compose `image:` field is outside the Dockerfile FROM pattern.'
+- id: supply-unpinned-base-image/tp-02-docker-latest
+  branch: supply-unpinned-base-image
+  file: cases/supply-unpinned-base-image/tp-02-docker-latest.yml
+  ground_truth: vulnerable
+  expected_label: true_positive
+  expected_severity: HIGH
+  second_signal_available: true
+  fn_class: n/a
+  edge_case: 'The docker://...:latest action ref - the exact form that is an FN-A blind spot for supply-actions-floating-tag
+    - is now CAUGHT here by the docker:// detect pattern. This realizes the corpus''s designed promotion:
+    the skill grew reach (a new branch), so the risk class moved from miss to catch.'
+  notes: 'Promotion-realized true positive: docker://...:latest fires the supply-unpinned-base-image docker://
+    regex; verify confirms no @sha256 digest.'

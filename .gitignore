@@ -1,0 +1,39 @@
+# trust-but-verify - .gitignore
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Local skill-output dirs (user-machine state, written into an AUDITED project)
+~/.trust-but-verify/
+.trust-but-verify-suppress.yml
+.trust-but-verify-session.yml
+docs/audits/
+docs/trust-debt-ledger.md
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+build/
+*.egg-info/
+
+# Sessions (paused / resumable state)
+sessions/
+*.session.yml
+
+# Logs
+*.log
+
+# If you add sensitive terms to hooks/pii-denylist.txt, uncomment to keep it local:
+# hooks/pii-denylist.txt
