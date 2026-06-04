@@ -1,0 +1,13 @@
+#!/bin/sh
+# trust-but-verify - pre-commit guard.
+# Scans the staged diff for personal references (AB-13) and secrets (AB-14)
+# before the commit object is created. Install (recommended): copy into a tracked
+# `.githooks/` dir and `git config core.hooksPath .githooks` so it travels with
+# clones; or copy into `.git/hooks/pre-commit` for a local-only install. `chmod
+# +x` either way. Adjust the runner path below to wherever you installed the
+# guards (this assumes the repo's `hooks/` dir; for a Claude Code project it is
+# usually `.claude/hooks/`).
+ROOT="$(git rev-parse --show-toplevel)"
+runner="$ROOT/hooks/git-guard-runner.mjs"
+[ -f "$runner" ] || exit 0
+exec node "$runner" pre-commit

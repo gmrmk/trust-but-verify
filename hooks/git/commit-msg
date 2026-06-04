@@ -1,0 +1,12 @@
+#!/bin/sh
+# trust-but-verify - commit-msg guard.
+# Scans the commit message for personal references (AB-13), secrets (AB-14), and
+# unverified absolute closure claims (AB-15: "all clean" / "no PII" / "100%" with
+# no proving signal named). Install (recommended): copy into a tracked `.githooks/`
+# dir and `git config core.hooksPath .githooks`; or copy into `.git/hooks/commit-msg`
+# for a local-only install. `chmod +x` either way. Adjust the runner path to
+# wherever you installed the guards.
+ROOT="$(git rev-parse --show-toplevel)"
+runner="$ROOT/hooks/git-guard-runner.mjs"
+[ -f "$runner" ] || exit 0
+exec node "$runner" commit-msg "$1"
