@@ -160,8 +160,9 @@ cases:
   expected_label: false_negative
   expected_severity: HIGH
   fn_class: FN-A
-  edge_case: A GPL dependency whose license is declared only in a LICENSE file, not the package.json 'license'
-    field. The predicate reads the manifest field and misses it.
+  edge_case: A GPL-3.0 dependency whose copyleft is declared only in its node_modules LICENSE file; its
+    package.json carries no 'license' field. The predicate reads each installed package's package.json
+    'license' field and never opens LICENSE files, so it misses this one (FN-A -- detection reach gap).
   notes: 'FN-A: license declared outside the scanned manifest field.'
 - id: a11y-color-contrast/tp-01-low-contrast
   branch: a11y-color-contrast

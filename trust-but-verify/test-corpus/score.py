@@ -91,7 +91,8 @@ def main():
     for c in manifest["cases"]:
         branch, label, fn = c["branch"], c["expected_label"], c.get("fn_class", "n/a")
         path = os.path.join(HERE, c["file"])
-        content = open(path, "r", encoding="utf-8").read()
+        with open(path, "r", encoding="utf-8") as fh:
+            content = fh.read()
         pats = regexes.get(branch, [])
         fired = any(p.search(content) for p in pats)
 
