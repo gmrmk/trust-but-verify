@@ -37,3 +37,8 @@ sessions/
 
 # If you add sensitive terms to hooks/pii-denylist.txt, uncomment to keep it local:
 # hooks/pii-denylist.txt
+
+# Synthetic corpus fixtures intentionally ship a node_modules/ tree so the
+# license-dep-conflict predicate (which scans installed packages) has real input.
+!trust-but-verify/test-corpus/structural/cases/**/node_modules/
+!trust-but-verify/test-corpus/structural/cases/**/node_modules/**
