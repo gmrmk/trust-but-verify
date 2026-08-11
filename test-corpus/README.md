@@ -13,11 +13,12 @@ The first documented blind spot (`docker://...:latest`, an FN-A under
 (`tp-02-docker-latest`) - the corpus's designed promotion realized: the recall
 ceiling (`verify_score.py`) rose 0.482 -> 0.491 because the skill grew reach.
 
-This fulfills the Control-phase requirement ("the
-baseline target should be a synthetic test corpus with labeled known-findings")
-and the roadmap re-entry rule #3 ("the PR adding a branch includes a labeled test
-case in `test-corpus/`"). See `manifest.yaml` `coverage:` and
-`structural/manifest.yaml`.
+This fulfills the Control-phase requirement ("the baseline target should be a
+synthetic test corpus with labeled known-findings") and the branch re-entry rule
+("the PR adding a branch includes a labeled test case in `test-corpus/`"). That
+rule is no longer honour-system: `scripts/check_branch_schema.py` fails CI if any
+branch in `trust-tree.yaml` has no labeled case. See `manifest.yaml` `coverage:`
+and `structural/manifest.yaml`.
 
 ---
 

@@ -1,0 +1,12 @@
+# Python dependencies for the corpus harnesses and the CI gate scripts.
+#
+# Pinned EXACTLY, not with a floating range. The repo's own
+# `supply-floating-version-range` branch treats `^`/`~`/`>=` as a finding: a
+# floating range means a fresh install can resolve to a version nobody reviewed.
+# A tool that ships a caret range while flagging caret ranges is the hypocrite
+# case its own doctrine refuses.
+#
+# Install:  python -m pip install -r requirements.txt
+# Bump:     change the pin, re-run the harnesses, note it in CHANGELOG.md.
+
+PyYAML==6.0.3

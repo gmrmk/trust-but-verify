@@ -410,7 +410,8 @@ Then write the entry to `<project>/docs/trust-debt-ledger.md`:
   audit_report: docs/audits/AUDIT-<date>-trust-but-verify.md
 ```
 
-(User-wide ledger deferred to v0.2 per roadmap.)
+(The ledger is project-local. A user-wide ledger spanning projects is not
+implemented.)
 
 ### Option [4] - Skip silently
 

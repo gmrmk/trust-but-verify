@@ -41,7 +41,8 @@ except Exception:
     pass
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
+ROOT = os.path.dirname(HERE)                       # repo root
+TREE = os.path.join(ROOT, "skills", "trust-but-verify", "trust-tree.yaml")
 
 def load_yaml(path):
     import yaml
@@ -79,7 +80,10 @@ def expected_detection(label, fn_class):
     return None
 
 def main():
-    tree = load_yaml(os.path.join(ROOT, "trust-tree.yaml"))
+    if not os.path.isfile(TREE):
+        print(f"trust-tree.yaml not found at {TREE}", file=sys.stderr)
+        return 2
+    tree = load_yaml(TREE)
     manifest = load_yaml(os.path.join(HERE, "manifest.yaml"))
     regexes = branch_regexes(tree)
 

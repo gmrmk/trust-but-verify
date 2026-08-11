@@ -1,11 +1,11 @@
 # Hooks
 
-A hard-stop guard for Claude Code. The `.mjs` hook reads the Claude Code hook
-payload from stdin and runs at a defined point in the tool lifecycle. It runs
-under Node.js.
+Four hard-stop guards for Claude Code. Each `.mjs` hook reads the Claude Code
+hook payload from stdin, runs at a defined point in the tool lifecycle, and exits
+`2` to block. They run under Node 18+ and have no dependencies.
 
-Wire it in `.claude/settings.json` under the matching `hooks` section. You can
-review or disable it from the `/hooks` menu.
+Wire them in `.claude/settings.json` under the matching `hooks` section — see
+[Wiring](#wiring). You can review or disable them from the `/hooks` menu.
 
 ## Hook reference
 
@@ -54,6 +54,17 @@ mutate" half.
 
 ## Wiring
 
+These guards are **opt-in by design**. Installing the `trust-but-verify` plugin
+does not activate them: the plugin manifest declares no `hooks` field, so nothing
+fires until you wire it yourself. That is deliberate. The guards block
+aggressively on purpose, and a guard that switches itself on and starts refusing
+a new user's writes gets the whole plugin disabled within a day - which protects
+nobody. Enable them when you have read what they block and decided you want that
+trade.
+
+Copy the guards next to your settings (for example into `.claude/hooks/`), then
+wire them in `.claude/settings.json`:
+
 ```json
 {
   "hooks": {
@@ -61,21 +72,47 @@ mutate" half.
       {
         "matcher": "Write|Edit|MultiEdit|Bash",
         "hooks": [
-          { "type": "command", "command": "node hooks/pii-guard.mjs" },
-          { "type": "command", "command": "node hooks/secret-scan-guard.mjs" }
+          { "type": "command", "command": "node .claude/hooks/pii-guard.mjs" },
+          { "type": "command", "command": "node .claude/hooks/secret-scan-guard.mjs" }
         ]
       },
       {
         "matcher": "Bash",
         "hooks": [
-          { "type": "command", "command": "node hooks/closure-claim-guard.mjs" },
-          { "type": "command", "command": "node hooks/irreversible-op-guard.mjs" }
+          { "type": "command", "command": "node .claude/hooks/closure-claim-guard.mjs" },
+          { "type": "command", "command": "node .claude/hooks/irreversible-op-guard.mjs" }
         ]
       }
     ]
   }
 }
 ```
+
+Node 18+ is required (the guards are dependency-free ESM using `node:` builtin
+specifiers). Paths in `command` are resolved relative to the directory Claude
+Code runs in, so use a path that holds from your project root. If you instead
+vendor the guards inside a plugin of your own, reference them through
+`"${CLAUDE_PLUGIN_ROOT}"` so the path survives the plugin cache:
+
+```json
+{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/hooks/pii-guard.mjs" }
+```
+
+### Verifying the guards still work
+
+`scripts/test_hooks.mjs` feeds each guard a real hook payload and asserts the
+exit code (2 = blocked, 0 = allowed), including the AB-5 property that a guard
+never echoes the secret it caught. It runs in CI on every pull request.
+
+```sh
+node scripts/test_hooks.mjs
+```
+
+Run it after editing any pattern. A guard's README is not evidence the guard
+fires - a regex that silently stops matching still has a README saying it blocks.
+That is not hypothetical here: these tests were written after the fact and
+immediately found that `closure-claim-guard.mjs` had never blocked `100%`,
+because a `\b` after `%` can never match.
 
 ## Git-side defense in depth
 

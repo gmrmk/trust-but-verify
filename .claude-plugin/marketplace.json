@@ -1,0 +1,23 @@
+{
+  "name": "gmrmk-skills",
+  "owner": {
+    "name": "gmrmk",
+    "url": "https://github.com/gmrmk"
+  },
+  "plugins": [
+    {
+      "name": "trust-but-verify",
+      "source": "./",
+      "description": "Socratic audit-and-repair skill for code artifacts, behind a two-signal verification gate.",
+      "version": "0.2.0",
+      "license": "MIT",
+      "homepage": "https://github.com/gmrmk/trust-but-verify",
+      "keywords": [
+        "audit",
+        "security",
+        "verification",
+        "trust-and-safety"
+      ]
+    }
+  ]
+}

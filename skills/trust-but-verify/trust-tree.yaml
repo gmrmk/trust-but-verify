@@ -16,13 +16,24 @@
 #      MUST NOT ship findings to Phase 3. The skill drops the branch and surfaces
 #      "BROKEN BRANCH: <id> has no usable verification step" to the operator.
 #
-#   2. A `framework:` list with at least one entry from `baseline_frameworks:`.
+#   2. A `framework:` list whose every entry is an id from `baseline_frameworks:`.
 #      Branches with empty `framework:` MUST NOT ship. There is no "we'll add
-#      grounding later" path - grounding is the gate, not the polish.
+#      grounding later" path - grounding is the gate, not the polish. Frameworks
+#      marked `external: false` are in-repo doctrine and may be cited ONLY by
+#      `epistemic` branches.
 #
 #   3. A `liability_template:` block (user_harm + legal_exposure) for any branch
 #      in security / privacy / license / supply_chain / operational categories.
-#      A11y uses the accessibility-framed variant per dialogue-protocol.md.
+#      A11y uses the accessibility-framed variant (users_affected +
+#      wcag_criterion) per dialogue-protocol.md. Epistemic branches are exempt.
+#
+#   4. At least one labeled case in `test-corpus/` (regex branches) or
+#      `test-corpus/structural/` (structural / tool-call branches). A branch
+#      with no test case is an unmeasured claim.
+#
+# These are not honour-system rules. `scripts/check_branch_schema.py` enforces
+# all four in CI, plus rca_defaults coverage and registry/grounding.md agreement.
+# Run it before opening a PR: `python scripts/check_branch_schema.py`
 #
 # Verification is the load-bearing discipline of this skill. A branch that
 # cannot verify cannot ship findings, no matter how clever its detection is.
@@ -37,7 +48,8 @@
 #   last_verified      ISO date this branch's detect/verify was last confirmed
 #                      against its cited framework version (see README
 #                      § "Keeping the trust tree fresh" + grounding.md)
-#   category           one of: security | privacy | license | a11y | supply_chain | operational
+#   category           one of: security | privacy | license | a11y | supply_chain |
+#                      operational | epistemic
 #   question           what the auditor asks of the artifact
 #   detect             how to find candidate findings (regex / structural / tool-call)
 #   verify             the second-signal check - MUST be independent + authoritative + falsifiable
@@ -123,6 +135,16 @@ baseline_frameworks:
       name: "CIS Controls v8"
       url: "https://www.cisecurity.org/controls/v8"
       authority: "Center for Internet Security"
+  # First-party doctrine, NOT an external standard. `external: false` is
+  # load-bearing: scripts/check_branch_schema.py permits ONLY epistemic branches
+  # to cite it, so a security/privacy/license/a11y/supply_chain/operational
+  # branch can never ground itself in this repo's own prose.
+  epistemic:
+    - id: tbv-uncertainty-protocol
+      name: "trust-but-verify UNCERTAINTY PROTOCOL"
+      url: "skills/trust-but-verify/SKILL.md#philosophy"
+      authority: "trust-but-verify (in-repo doctrine)"
+      external: false
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Triggers - file patterns the code domain applies to
@@ -488,6 +510,7 @@ branches:
       - nist-ssdf
       - cwe-top25
     liability_template:
+      user_harm: "Users run code with a publicly documented, publicly exploitable weakness - the exploit is already written and the version is already fingerprintable from the outside."
       legal_exposure: "Shipping known-vulnerable code is 'reasonable security' failure under FTC, GDPR, CCPA, SOC 2."
 
   # -- v0.2 supply-chain branches --
@@ -576,6 +599,7 @@ branches:
       - nist-csf-2
     liability_template:
       user_harm: "Security researchers have no channel for responsible disclosure. Increases probability of public 0-day."
+      legal_exposure: "No named regulation compels a SECURITY.md, but its absence is scored by OpenSSF Scorecard (Security-Policy) and reads as a due-care gap in NIST CSF 2.0 RS.CO / vendor-security review."
 
   - id: op-stack-trace-leakage
     last_verified: "2026-05-25"
@@ -619,7 +643,7 @@ branches:
     verify: "Read 5 lines context. Drop if past-tense / test name / quoted historical reasoning. Keep if in active assertion."
     severity: MEDIUM
     framework:
-      - in-repo: "trust-but-verify UNCERTAINTY PROTOCOL"
+      - tbv-uncertainty-protocol
 
   - id: epi-unverified-external
     last_verified: "2026-05-25"
@@ -630,7 +654,7 @@ branches:
     verify: "WebFetch the URL. HTTP 200/204 = verified. 404 = finding. 3xx = update to canonical. For npm/PyPI paths, cross-check against registry."
     severity: HIGH
     framework:
-      - in-repo: "trust-but-verify UNCERTAINTY PROTOCOL"
+      - tbv-uncertainty-protocol
 
   - id: epi-state-mutation-no-readback
     last_verified: "2026-05-25"
@@ -643,4 +667,4 @@ branches:
     verify: "Read 30 lines downstream. Drop if a read-back / status check appears."
     severity: HIGH
     framework:
-      - in-repo: "trust-but-verify UNCERTAINTY PROTOCOL (founding principle)"
+      - tbv-uncertainty-protocol   # founding principle

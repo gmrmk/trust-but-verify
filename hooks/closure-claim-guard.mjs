@@ -11,8 +11,12 @@
 // Contract: a PreToolUse hook that exits 2 blocks the tool and shows stderr to
 // the model. Wire it in settings.json under hooks.PreToolUse for matcher Bash.
 
+// NOTE on the shape: `100%` is matched by its own alternative WITHOUT a trailing
+// \b. A word boundary after `%` requires a word character next, so `\b(100%)\b`
+// never fires on "100% clean" - the `%` and the following space are both
+// non-word. scripts/test_hooks.mjs covers this case; keep it covered.
 const ABSOLUTE =
-  /\b(100%|fully (sanitized|clean|fixed|removed|gone)|all (clean|gone|removed|fixed|sanitized|purged)|nothing (personal|left|remains)|no\s+pii( anywhere)?|zero pii|guaranteed|definitely (safe|clean|gone|removed)|verified safe|totally clean|completely (fixed|safe|clean|removed|purged)|never fails|cannot fail|is now safe|fully resolved)\b/i;
+  /100\s*%|\b(fully (sanitized|clean|fixed|removed|gone)|all (clean|gone|removed|fixed|sanitized|purged)|nothing (personal|left|remains)|no\s+pii( anywhere)?|zero pii|guaranteed|definitely (safe|clean|gone|removed)|verified safe|totally clean|completely (fixed|safe|clean|removed|purged)|never fails|cannot fail|is now safe|fully resolved)\b/i;
 
 // A named second signal that turns an absolute into a verified claim.
 const PROOF =

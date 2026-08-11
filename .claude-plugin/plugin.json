@@ -1,0 +1,22 @@
+{
+  "name": "trust-but-verify",
+  "displayName": "Trust but Verify",
+  "version": "0.2.0",
+  "description": "Socratic audit-and-repair skill for code artifacts. Walks a codebase one finding at a time behind a two-signal verification gate, grounded in OWASP, NIST, WCAG, GDPR, SPDX, and CWE.",
+  "author": {
+    "name": "gmrmk",
+    "url": "https://github.com/gmrmk"
+  },
+  "homepage": "https://github.com/gmrmk/trust-but-verify",
+  "repository": "https://github.com/gmrmk/trust-but-verify",
+  "license": "MIT",
+  "keywords": [
+    "audit",
+    "security",
+    "privacy",
+    "accessibility",
+    "supply-chain",
+    "verification",
+    "trust-and-safety"
+  ]
+}

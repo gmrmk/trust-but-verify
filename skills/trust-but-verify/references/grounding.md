@@ -119,11 +119,23 @@ This file is the single source of truth for what the skill considers "official."
 
 The category that started the skill - pre-T&S-baseline.
 
-| Source | URL |
-|--------|-----|
-| The trust-but-verify doctrine | in-repo `SKILL.md` § Philosophy |
+| Registry id | Source | URL | External? |
+|-------------|--------|-----|-----------|
+| `tbv-uncertainty-protocol` | The trust-but-verify doctrine | in-repo `SKILL.md` § Philosophy | **No** |
 
 **Used by branches:** `epi-hedged-language`, `epi-unverified-external`, `epi-state-mutation-no-readback`.
+
+This entry is registered in `trust-tree.yaml` under `baseline_frameworks.epistemic`
+with `external: false`, so epistemic branches cite a registry id like every other
+branch instead of an ad-hoc string. The flag is load-bearing:
+`scripts/check_branch_schema.py` allows an `external: false` framework to be cited
+**only** by an `epistemic` branch. A security, privacy, license, a11y,
+supply-chain, or operational branch that tried to ground itself in this repo's own
+prose would fail CI - which is the point. Grounding a safety check in your own
+say-so is the fabricated-grounding failure wearing a citation.
+
+`scripts/check_citations.py` verifies this entry by resolving the repo-relative
+path rather than fetching a URL.
 
 ---
 
@@ -135,7 +147,7 @@ When a new branch in `trust-tree.yaml` needs a new framework, add the framework 
 2. **Current** - the `version:` field MUST name the current authoritative version. `verified_accessible:` MUST be set to the ISO date the URL was last successfully fetched + content-matched.
 3. **Specific** - the citation MUST reference a specific section, control identifier, or rule (`A03:2021-Injection`, `WCAG 2.2 § 1.4.3`, etc.), not "see [whole framework]."
 4. **Permanently linkable** - the URL MUST be a stable canonical URL. Search results, tweets, and ephemeral URLs MUST NOT be cited.
-5. **Re-verifiable in CI** - every URL added here is fetched and content-matched as part of the release-quality gate (anti-AB-1). Entries that cannot be re-verified MUST be removed from the registry.
+5. **Re-verifiable in CI** - every URL added here is fetched and content-matched by `scripts/check_citations.py` as part of the release-quality gate (anti-AB-1). Entries that cannot be re-verified MUST be removed from the registry. Add the framework to `baseline_frameworks:` in `trust-tree.yaml` as well as to the table above - `scripts/check_branch_schema.py` fails if the registry and this file disagree.
 
 If a check cannot satisfy ALL FIVE rules, the skill MUST surface the finding as AMBIGUOUS and ask the operator how to proceed. Citing an unofficial source to make a finding land is a Quality-bar violation (see SKILL.md § *"No fabricated grounding"*).
 
@@ -143,8 +155,15 @@ If a check cannot satisfy ALL FIVE rules, the skill MUST surface the finding as 
 
 Before any release of trust-but-verify, every URL in this file MUST be:
 
-1. Fetched and confirmed HTTP 200
-2. Content-matched: the framework name AND version string MUST appear verbatim in the fetched body
+1. Fetched and confirmed reachable
+2. Content-matched: a distinctive token from the framework name MUST appear in the fetched body
 3. Re-stamped with the new `verified_accessible:` date
 
 A release with stale citations MUST NOT ship. See `references/anti-behaviors.md` § AB-1 for the full defense spec.
+
+**This is mechanized, not honour-system.** `scripts/check_citations.py` performs steps 1 and 2; `.github/workflows/citations.yml` runs it weekly, on demand, and on every `v*` release tag (with `--strict`, which escalates a content-match miss into a failure). Step 3 is still a human edit - re-stamp the dates in the tables above when a release run passes.
+
+Two calibrations in that script are worth knowing, because both were learned by running it:
+
+- **A 403 or 429 is not staleness.** It means the host refused *this client* - bot protection, a WAF, a corporate proxy - and says nothing about whether the document exists. `ftc.gov` serves 403 to a non-browser user-agent and 200 to a browser one. Only a 404/410, or a connection that never completes, proves a citation is gone. Blocked responses are reported as BLOCKED for a human to confirm, never counted as failures.
+- **Liveness is not a pull-request gate.** A network fetch in the PR gate lets one government host's outage block an unrelated merge, and the team learns to click past a red check - which is AB-9 (bypass normalization) manufactured by our own tooling. Hence the schedule-plus-release cadence.
